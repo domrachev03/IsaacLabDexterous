@@ -1,0 +1,537 @@
+
+from __future__ import annotations
+
+import math
+import torch
+from collections.abc import Sequence
+
+import numpy as np
+
+import isaaclab.sim as sim_utils
+from isaaclab.assets import Articulation, RigidObject
+# from isaaclab.assets import ArticulationCfg, AssetBaseCfg
+from isaaclab.envs import DirectRLEnv
+from isaaclab.sim.spawners.from_files import GroundPlaneCfg, spawn_ground_plane
+from isaaclab.sensors import ContactSensor
+from isaaclab.sensors import Camera
+
+# from isaaclab.utils.math import quat_to_rot_mats
+from isaaclab.utils.math import quat_apply
+
+##
+# Configuration
+##
+
+from .delto_env_cfg import DeltoEnvCfg
+
+   
+# =====================================================================================================
+# =====================================================================================================
+# =====================================================================================================
+
+class DeltoEnv(DirectRLEnv):
+    cfg: DeltoEnvCfg
+
+    def __init__(self, cfg: DeltoEnvCfg, render_mode: str | None = None, **kwargs):
+        super().__init__(cfg, render_mode, **kwargs)
+
+        N = self.scene.num_envs
+
+        self.action_scale = self.cfg.action_scale
+
+        # Координаты центров сред
+        self.env_origins = self.scene.env_origins
+
+        # -------------------------------------------
+
+        self.hand = self.scene.articulations["hand"]
+
+        self.hand_joint_ids, _ = self.hand.find_joints(cfg.hand_joint_names)
+        self.arm_joint_ids, _ = self.hand.find_joints(cfg.arm_joint_names)
+        self.ft_ids = [self.hand.body_names.index(n) for n in self.cfg.ft_names]
+        
+        self.object = self.scene.rigid_objects["object"]
+        self.table = self.scene.rigid_objects["table"]
+        self.wall = self.scene.rigid_objects["wall"]
+
+        self.cam = self.scene.sensors["camera"]
+
+        # -------------------------------------------
+
+        self.joint_pos = self.hand.data.joint_pos
+        self.joint_vel = self.hand.data.joint_vel   
+
+        # -------------------------------------------
+
+        self.contact_treshold = 1.5
+
+        self.hold_count = torch.zeros(N, dtype=torch.long, device=self.device)
+
+        self.prev_contact_flags = torch.zeros(N, 5, device=self.device)
+        self.prev_hand_open = torch.zeros(N, device=self.device)
+
+        self.phase = torch.zeros(N, dtype=torch.long, device=self.device)
+        self.phase_step = torch.zeros(N, dtype=torch.long, device=self.device)
+
+        self.lift_hold_ok = torch.zeros(N, dtype=torch.long, device=self.device)
+        self.grasp_ok_counter = torch.zeros(N, dtype=torch.long, device=self.device)
+        self.slip_counter = torch.zeros(N, dtype=torch.long, device=self.device)
+
+        # -------------------------------------------
+
+        # линейная траектория для сустава руки во время подъема
+        self.arm_start = torch.zeros(N, len(self.arm_joint_ids), device=self.device)
+        self.arm_goal  = torch.zeros_like(self.arm_start)
+
+        with torch.no_grad():
+            self.arm_start= self.joint_pos[:, self.arm_joint_ids]
+            delta = torch.tensor(self.cfg.lift_delta_deg, device=self.device) * torch.pi/180.0
+            self.arm_goal = self.arm_start + delta
+
+# =====================================================================================================
+
+    def _setup_scene(self):
+        # prim_utils.create_prim("/World/envs/env_0/Robot", "Xform")
+        spawn_ground_plane("/World/ground", GroundPlaneCfg())
+
+        self.hand = Articulation(self.cfg.robot_cfg)
+        self.scene.articulations["hand"] = self.hand
+
+        self.object = RigidObject(self.cfg.object_cfg)
+        self.scene.rigid_objects["object"] = self.object
+
+        self.table = RigidObject(self.cfg.table_cfg)
+        self.scene.rigid_objects["table"] = self.table
+
+        self.wall = RigidObject(self.cfg.wall_cfg)
+        self.scene.rigid_objects["wall"] = self.wall
+
+        self.cam = Camera(self.cfg.cam_cfg)
+        self.scene.sensors["camera"] = self.cam
+
+        self.scene.clone_environments(copy_from_source=False)
+
+        if self.device == "cpu":
+            self.scene.filter_collisions(global_prim_paths=[])
+
+        light_cfg = sim_utils.DomeLightCfg(intensity=2000.0, color=(0.75, 0.75, 0.75))
+        light_cfg.func("/World/Light", light_cfg)
+
+        for name in self.cfg.ft_names:
+            self.scene.sensors[name] = ContactSensor(self.cfg.contact_sensors[name])    # доступ: self.scene.sensors["robot0_ffdistal"]
+
+# =====================================================================================================
+
+    def _pre_physics_step(self, actions: torch.Tensor) -> None:
+        actions[:, 0] += 30*np.pi/180   # Чтобы большой палец оттопырить 
+        actions[:, 5] -= 50*np.pi/180
+        self.actions = self.action_scale * actions.clone()
+
+        # self._update_and_apply_disturbances()
+
+# =====================================================================================================
+
+    def _apply_action(self):
+        # контакты
+        fforce, flags, fpose = self._read_contacts(threshold=self.contact_treshold, frame="w")  # силы и флаги в world frame
+
+        com_w = self.object.data.body_com_pos_w[:, 0, 0:3]
+        com   = com_w - self.env_origins
+
+        table_pos = self.table.data.root_pos_w[:, :] - self.env_origins
+        table_top_z = table_pos[:, 2] + 0.05
+
+        # Подъём скриптом
+        self._update_phase_and_scripted_arm(flags, fpose, com, table_top_z)
+
+        # print(self.actions*180/np.pi)
+
+        # ФАЗА 0: агент двигает пальцы 
+        if (self.phase == 0).any():
+            ids = (self.phase == 0).nonzero(as_tuple=False).squeeze(-1)
+
+            self.hand.set_joint_position_target(
+                self.actions[ids], joint_ids=self.hand_joint_ids, env_ids=ids
+            )
+
+        # ФАЗА 1: подъем 
+        if (self.phase == 1).any():
+            ids = (self.phase == 1).nonzero(as_tuple=False).squeeze(-1)
+
+            self.hand.set_joint_position_target(
+                self.actions[ids], joint_ids=self.hand_joint_ids, env_ids=ids
+            )
+
+# =====================================================================================================
+
+    def _get_observations(self):
+
+        rgb = self.cam.data.output["rgb"]
+
+        # силы и флаги в world frame
+        fforce, flags, fpose = self._read_contacts(threshold=self.contact_treshold, frame="w")
+
+        # object_pos = self.object.data.body_link_pose_w[:,0,:3]
+        # object_pos -= self.env_origins
+        # object_quat = self.object.data.body_link_pose_w[:,0,3:]
+
+        # # центр хвата (grasp center) из кончиков
+        # w = torch.clamp(flags, min=0.1)
+        # wsum = w.sum(dim=1, keepdim=True)
+        # grasp_center = (fpose * w.unsqueeze(-1)).sum(dim=1) / wsum
+
+        # # относительный вектор от grasp_center до COM объекта
+        # rel_vec   = object_pos - grasp_center
+        # rel_dist  = torch.linalg.norm(rel_vec, dim=-1, keepdim=True)
+        # rel_dir   = rel_vec / (rel_dist + 1e-6)
+
+        hand_open = self._hand_open_fraction().unsqueeze(1)
+
+        obs = {
+            "joints_pos": self.joint_pos,
+            "joints_vel": self.joint_vel,
+
+            "contact_forces": fforce,
+            "contact_flags": flags,
+            # "finger_tips_pos": fpose,
+
+            # "object_pos": object_pos,
+            # "object_quat": object_quat,
+
+            # "rel_dist": rel_dist,
+            # "rel_dir": rel_dir,
+
+            "hand_open": hand_open,
+        }
+
+        return {"state": obs}
+        # return {"state": obs, "rgb": rgb}
+    
+# =====================================================================================================
+
+    def _get_rewards(self) -> torch.Tensor:
+
+        fforce, flags, fpose = self._read_contacts(threshold=self.contact_treshold, frame="w")  # силы и флаги в world frame
+   
+        prev_flags = self.prev_contact_flags
+
+        object_com_w = self.object.data.body_com_pos_w[:, 0, 0:3]
+        object_com   = object_com_w - self.env_origins
+
+        # центр хвата и расстояние
+        w = torch.clamp(flags, min=0.1)
+        wsum = w.sum(dim=1, keepdim=True)
+        grasp_center = (fpose * w.unsqueeze(-1)).sum(dim=1) / wsum
+        rel_vec  = object_com - grasp_center
+        rel_dist = torch.linalg.norm(rel_vec, dim=-1)
+
+        # 1) тянуться к объекту
+        # r_approach = 3.0 * (self._prev_rel_dist - rel_dist)
+        r_approach = -15.0 * rel_dist
+
+        # 2) Закрытие ладони
+        hand_open = self._hand_open_fraction()                # (N,)
+
+        # no_contact = (flags.sum(dim=1) == 0)
+        # delta_close = (self.prev_hand_open - hand_open).clamp(min=0.0)
+        # r_preclose = torch.where(no_contact, 2.0 * delta_close, torch.zeros_like(delta_close))
+
+        r_preclose = 1.0 * (0.5 - hand_open)
+
+        # 3) новое касание
+        # new_contacts = ((flags > 0.5) & (prev_flags <= 0.5)).float().sum(dim=1)
+        # r_contact_event = 2.5 * new_contacts
+
+        # 4) удержание контактов
+        active_cnt = (flags > 0.5).float().sum(dim=1)
+        r_contact_hold = 1.5 * active_cnt
+
+        # 5) «распор»
+        # fc = self._force_closure_score(flags, ft_pos, com, min_active=3, angle_deg=110.0)
+        # r_fc = 1.8 * fc
+
+        # flip_cnt = ((flags - prev_flags).abs() > 0).float().sum(dim=1)
+        # r_stability = -0.2 * flip_cnt
+
+        # 6) бонус за высоту
+        table_pos = self.table.data.root_pos_w[:, :] - self.env_origins
+        table_top_z = table_pos[:, 2] + 0.05
+        obj_h = (object_com[:, 2] - table_top_z - 0.15/2)
+        r_h = 10.0 * obj_h
+
+        # 6) штраф за время
+        time_penalty = -0.01 * torch.ones(self.num_envs, device=self.device)
+
+        rew = r_approach + r_preclose + r_contact_hold + r_h + time_penalty
+
+        success_mask = (self.phase == 1) & (self.phase_step >= self.cfg.lift_steps) & (obj_h > self.cfg.success_height)
+        fail_slip_mask = (self.phase == 1) & (self.slip_counter >= self.cfg.slip_grace)
+
+        # падение по наклону
+        obj_quat_w = self.object.data.root_quat_w
+        local_z = torch.tensor([0.0, 0.0, 1.0], device=self.device, dtype=obj_quat_w.dtype).expand(obj_quat_w.shape[0], 3)
+        obj_z_axis_world = quat_apply(obj_quat_w, local_z)
+        cos_tilt = obj_z_axis_world[:, 2].clamp(-1.0, 1.0)
+        tilt_rad = torch.arccos(cos_tilt)
+        fail_tilt_mask = tilt_rad > (self.cfg.tilt_fail_deg * torch.pi / 180.0)
+
+        fail_mask = fail_slip_mask | fail_tilt_mask
+
+        rew = rew + 5.0 * success_mask.float() - 1.0 * fail_mask.float()
+
+        with torch.no_grad():
+            self.prev_contact_flags.copy_(flags)
+            self.prev_hand_open.copy_(hand_open)
+
+        return rew
+    
+# =====================================================================================================
+
+    def _get_dones(self) -> tuple[torch.Tensor, torch.Tensor]:
+        
+        # ориентация объекта во всех средах, форма
+        obj_quat_w = self.object.data.body_link_pose_w[:, 0, 3:]
+
+        # Локальная ось z объекта в мировых координатах через quat_apply
+        local_z = torch.tensor([0.0, 0.0, 1.0],
+                            device=self.device,
+                            dtype=obj_quat_w.dtype).expand(obj_quat_w.shape[0], 3)
+        
+        obj_z_world = quat_apply(obj_quat_w, local_z)
+
+        # косинус угла между obj_z_world и мировым e_z
+        cos_tilt = torch.clamp((obj_z_world * local_z).sum(dim=-1), -1.0, 1.0)
+        tilt_rad = torch.acos(cos_tilt)
+        tilt_deg = tilt_rad * (180.0 / torch.pi)
+
+
+        # termination по наклону
+        terminations = tilt_deg > self.cfg.tilt_fail_deg
+        # truncation по длине эпизода
+        truncations = self.episode_length_buf >= self.max_episode_length
+
+
+        return terminations, truncations
+    
+# =====================================================================================================
+
+    def _reset_idx(self, env_ids: Sequence[int] | None):
+        if env_ids is None:
+            env_ids = self.hand._ALL_INDICES
+        super()._reset_idx(env_ids)
+
+        joint_pos = torch.zeros((len(env_ids), 26), device=self.device)
+        joint_vel = torch.zeros((len(env_ids), 26), device=self.device)
+
+        joint_pos[:, :6] = torch.tensor(self.cfg.start_position, device=self.device)*np.pi/180
+        joint_pos[:, 6:] = torch.tensor(self.cfg.hand_position, device=self.device)*np.pi/180
+ 
+        self.joint_pos[env_ids] = joint_pos
+        self.joint_vel[env_ids] = joint_vel
+        self.hand.write_joint_state_to_sim(joint_pos, joint_vel, None, env_ids)
+
+        self.phase[env_ids] = 0
+        self.phase_step[env_ids] = 0
+        self.lift_hold_ok[env_ids] = 0
+        self.grasp_ok_counter[env_ids] = 0
+        self.slip_counter[env_ids] = 0
+
+        with torch.no_grad():
+            self.arm_start[env_ids] = self.joint_pos[env_ids][:, self.arm_joint_ids]
+            delta = torch.tensor(self.cfg.lift_delta_deg, device=self.device) * torch.pi/180.0
+            self.arm_goal[env_ids]  = self.arm_start[env_ids] + delta
+
+        self.hand.set_joint_position_target(self.arm_start[env_ids], joint_ids=self.arm_joint_ids, env_ids=env_ids)
+
+        self._reset_object_on_table(env_ids)
+
+        self.cam.reset(env_ids)
+
+    # =====================================================================================================
+
+    def _reset_object_on_table(self, env_ids):
+
+        root_state = self.object.data.default_root_state[env_ids].clone()
+
+        noise_xy = 0.02 * (torch.rand((len(env_ids), 2), device=self.device) - 0.5)
+        root_state[:, 0] += noise_xy[:, 0]              # x
+        root_state[:, 1] += noise_xy[:, 1]              # y
+
+        # скорости в ноль
+        root_state[:, 7:13] = 0.0
+
+        # сдвиг до центров копий среды
+        root_state[:, 0:3] += self.scene.env_origins[env_ids]
+
+        self.object.write_root_state_to_sim(root_state, env_ids)
+
+# ===========================================================================
+# ===========================================================================
+# ===========================================================================
+
+    def _read_contact_forces(self, frame: str = "w") -> torch.Tensor:
+        """
+        Возвращает тензор сил контакта размера (num_envs, num_fingers, 3).
+        frame: 'w' — в мировых координатах, 'b' — в body frame (локально для линка).
+        """
+        assert frame in ("w", "b")
+        forces_per_finger = []
+        attr = f"net_forces_{frame}"
+
+        for name in self.cfg.ft_names:
+            s = self.scene.sensors[name]
+            f = getattr(s.data, attr)  # shape: (N, 3) или (N, H, 3) при history_length>1
+            if f.ndim == 3:
+                f = f[:, -1, :]  # берём последний сэмпл истории
+
+            fnorm = torch.linalg.norm(f, dim=-1)
+            forces_per_finger.append(fnorm)
+
+        return torch.stack(forces_per_finger, dim=1)  # (N, 5)
+    
+    # =====================================================================================================
+
+    def _read_contact_flags(
+        self,
+        threshold: float = 1.0,
+        frame: str = "w",
+    ) -> torch.Tensor:
+        """
+        Булевы флаги контакта (norm(force) > threshold) размера (num_envs, num_fingers).
+        threshold — порог в Ньютонах.
+        """
+        F = self._read_contact_forces(frame=frame)          # (N, 5, 3)
+        norms = torch.linalg.norm(F, dim=-1)                # (N, 5)
+        return norms > threshold
+    
+    # =====================================================================================================
+    
+    def compute_force_closure(env, contact_sensors, object_pose, friction_coeff=0.8, cone_sides=8):
+        """
+        Проверка force closure для контактов с объектом.
+        
+        Args:
+            env: среда Isaac Lab
+            contact_sensors: список ContactSensorCfg (по одному на палец)
+            object_pose: (pos, quat) объекта
+            friction_coeff: μ для конуса трения
+            cone_sides: аппроксимация конуса (больше → точнее)
+        Returns:
+            bool: True если force closure, False иначе
+        """
+        # центр объекта
+        obj_pos = object_pose[0]
+
+        wrenches = []
+
+        for sensor in contact_sensors:
+            contacts = sensor.data.body_contact_forces  # [N_contacts, 3]
+            points = sensor.data.body_contact_positions # [N_contacts, 3]
+            
+            for f, p in zip(contacts, points):
+                if torch.norm(f) < 1e-6:
+                    continue  # нет контакта
+                
+                n = f / (torch.norm(f) + 1e-8)  # нормаль контакта
+                # генерируем "пирамиду" трения
+                basis = torch.randn(3, cone_sides)
+                basis = torch.nn.functional.normalize(basis, dim=0)
+                for i in range(cone_sides):
+                    # сила внутри конуса
+                    fi = n + friction_coeff * basis[:, i]
+                    fi = fi / torch.norm(fi) * torch.norm(f)
+                    # момент = r × f
+                    r = p - obj_pos
+                    tau = torch.cross(r, fi)
+                    wrench = torch.cat([fi, tau])
+                    wrenches.append(wrench)
+        
+        if len(wrenches) < 6:
+            return False
+        
+        W = torch.stack(wrenches, dim=1)  # [6, M]
+        # Проверяем ранг
+        if torch.linalg.matrix_rank(W) < 6:
+            return False
+        
+        # TODO: Можно добавить LP-проверку, что ноль лежит внутри конуса
+        return True
+    
+    # =====================================================================================================        
+
+    def _read_contacts(self, threshold: float = 1.0, frame: str = "w",
+    ):
+        F = self._read_contact_forces(frame=frame)
+        flags = (F > threshold).float()
+
+        ft_pos_w = self.hand.data.body_pos_w[:, self.ft_ids, :]         # (N,5,3) world
+        ft_pos   = ft_pos_w - self.env_origins.unsqueeze(1)
+
+        return F, flags, ft_pos
+    
+# ===========================================================================
+# ===========================================================================
+# ===========================================================================
+
+    def _update_phase_and_scripted_arm(self, flags, ft_pos, com_local, table_top_z):
+        """
+        Управляет переходами фаз и скриптовым подъёмом UR10.
+        """
+        
+        # --- критерий хват-фазы (фаза 0)
+        # 1) достаточно активных пальцев, 2) force-closure высокий, 3) COM близко к центру хвата
+        active_cnt = (flags > 0.5).sum(dim=1)
+
+        grasp_condition = (active_cnt >= self.cfg.grasp_contact_min)
+
+        # считаем последовательные шаги с выполненным условием
+        self.grasp_ok_counter = torch.where(
+                                    grasp_condition,
+                                    self.grasp_ok_counter + 1,
+                                    torch.clamp(self.grasp_ok_counter - 2, min=0)
+                                )
+        # --- переход 0 -> 1
+        start_lift_mask = (self.phase == 0) & (self.grasp_ok_counter >= self.cfg.grasp_hold_steps)
+        if start_lift_mask.any():
+            ids = start_lift_mask.nonzero(as_tuple=False).squeeze(-1)
+            # перезапускаем счетчики
+            self.phase[ids] = 1
+            self.phase_step[ids] = 0
+            self.slip_counter[ids] = 0
+            self.lift_hold_ok[ids] = 0
+            # уже записаны arm_start/arm_goal в reset; на подъем просто интерполируем
+
+        # --- если мы в фазе 1 — двигаем руку по линейной интерполяции и следим за «скольжением»
+        in_lift = (self.phase == 1)
+        if in_lift.any():
+            ids = in_lift.nonzero(as_tuple=False).squeeze(-1)
+            t = (self.phase_step[ids].float() / max(1, self.cfg.lift_steps)).clamp(0, 1).unsqueeze(1)  # (B,1)
+            targ = (1 - t) * self.arm_start[ids] + t * self.arm_goal[ids]                              # (B, n_arm)
+
+            self.hand.set_joint_position_target(
+                targ, joint_ids=self.arm_joint_ids, env_ids=ids
+            )
+
+            # критерий «хват не потерян»: либо контакты держатся, либо объект реально поднят
+            obj_height = (com_local[ids, 2] - table_top_z[ids])  # в метрах
+            good = (active_cnt[ids] >= self.cfg.grasp_contact_min) | (obj_height > self.cfg.success_height)
+            self.slip_counter[ids] = torch.where(good, torch.zeros_like(self.slip_counter[ids]),
+                                                self.slip_counter[ids] + 1)
+
+            self.phase_step[ids] += 1
+
+    # =====================================================================================================        
+
+    def _hand_open_fraction(self):
+        """
+        Грубая метрика "насколько рука открыта" в [0..1], где 1 = максимально раскрыта.
+        Используем только сгибающие DOF пальцев.
+        """
+
+        q = self.joint_pos[:, self.hand_joint_ids]
+        q = q[:, 6:]
+        open_frac = torch.sigmoid(-3.0 * q).mean(dim=1)
+        return open_frac.clamp(0.0, 1.0)
+    
+    # =====================================================================================================        
+

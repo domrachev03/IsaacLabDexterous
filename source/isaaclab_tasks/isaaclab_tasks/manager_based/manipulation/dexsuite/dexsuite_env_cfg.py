@@ -295,8 +295,9 @@ class EventCfg:
     reset_robot_wrist_joint = EventTerm(
         func=mdp.reset_joints_by_offset,
         mode="reset",
+        # FIXME: generalize to different robot arms
         params={
-            "asset_cfg": SceneEntityCfg("robot", joint_names="iiwa7_joint_7"),
+            "asset_cfg": SceneEntityCfg("robot", joint_names="wrist_3_joint"),
             "position_range": [-3, 3],
             "velocity_range": [0.0, 0.0],
         },

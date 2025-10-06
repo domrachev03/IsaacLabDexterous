@@ -49,10 +49,11 @@ def object_ee_distance(
 def contacts(env: ManagerBasedRLEnv, threshold: float) -> torch.Tensor:
     """Penalize undesired contacts as the number of violations that are above a threshold."""
 
-    thumb_contact_sensor: ContactSensor = env.scene.sensors["thumb_link_3_object_s"]
-    index_contact_sensor: ContactSensor = env.scene.sensors["index_link_3_object_s"]
-    middle_contact_sensor: ContactSensor = env.scene.sensors["middle_link_3_object_s"]
-    ring_contact_sensor: ContactSensor = env.scene.sensors["ring_link_3_object_s"]
+    # FIXME: generalize to different robot arms
+    thumb_contact_sensor: ContactSensor = env.scene.sensors["rl_dg_2_4_object_s"]
+    index_contact_sensor: ContactSensor = env.scene.sensors["rl_dg_3_4_object_s"]
+    middle_contact_sensor: ContactSensor = env.scene.sensors["rl_dg_4_4_object_s"]
+    ring_contact_sensor: ContactSensor = env.scene.sensors["rl_dg_5_4_object_s"]
     # check if contact force is above threshold
     thumb_contact = thumb_contact_sensor.data.force_matrix_w.view(env.num_envs, 3)
     index_contact = index_contact_sensor.data.force_matrix_w.view(env.num_envs, 3)

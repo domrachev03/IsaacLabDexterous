@@ -50,10 +50,10 @@ def contacts(env: ManagerBasedRLEnv, threshold: float) -> torch.Tensor:
     """Penalize undesired contacts as the number of violations that are above a threshold."""
 
     # FIXME: generalize to different robot arms
-    thumb_contact_sensor: ContactSensor = env.scene.sensors["rl_dg_2_4_object_s"]
-    index_contact_sensor: ContactSensor = env.scene.sensors["rl_dg_3_4_object_s"]
-    middle_contact_sensor: ContactSensor = env.scene.sensors["rl_dg_4_4_object_s"]
-    ring_contact_sensor: ContactSensor = env.scene.sensors["rl_dg_5_4_object_s"]
+    thumb_contact_sensor: ContactSensor = env.scene.sensors["thumb_link_3_object_s"]
+    index_contact_sensor: ContactSensor = env.scene.sensors["index_link_3_object_s"]
+    middle_contact_sensor: ContactSensor = env.scene.sensors["middle_link_3_object_s"]
+    ring_contact_sensor: ContactSensor = env.scene.sensors["ring_link_3_object_s"]
     # check if contact force is above threshold
     thumb_contact = thumb_contact_sensor.data.force_matrix_w.view(env.num_envs, 3)
     index_contact = index_contact_sensor.data.force_matrix_w.view(env.num_envs, 3)
@@ -93,7 +93,7 @@ def success_reward(
         # square is not necessary but this help to keep the final value between having rot_std or not roughly the same
         return (1 - torch.tanh(pos_dist / pos_std)) ** 2
     rot_dist = torch.norm(rot_err, dim=1)
-    return (1 - torch.tanh(pos_dist / pos_std)) * (1 - torch.tanh(rot_dist / rot_std))
+    return (1 - torch.tanh(pos_dist / pos_std)) * (1 - torch.tanh(rot_dist / rot_std)) * contacts(env, 1.0).float()
 
 
 def position_command_error_tanh(

@@ -22,12 +22,15 @@ class KukaAllegroRelJointPosActionCfg:
 
 @configclass
 class KukaAllegroReorientRewardCfg(dexsuite.RewardsCfg):
-
     # bool awarding term if 2 finger tips are in contact with object, one of the contacting fingers has to be thumb.
     good_finger_contact = RewTerm(
         func=mdp.contacts,
         weight=2.0,
-        params={"threshold": 1.0},
+        params={
+            "threshold": 1.0,
+            "thumb_contact_name": "thumb_link_3",
+            "tip_contact_names": ("index_link_3", "middle_link_3", "ring_link_3"),
+        },
     )
 
 
@@ -56,7 +59,30 @@ class KukaAllegroMixinCfg:
             clip=(-20.0, 20.0),  # contact force in finger tips is under 20N normally
         )
         self.observations.proprio.hand_tips_state_b.params["body_asset_cfg"].body_names = ["palm_link", ".*_tip"]
-        self.rewards.fingers_to_object.params["asset_cfg"] = SceneEntityCfg("robot", body_names=["palm_link", ".*_tip"])
+        self.rewards.fingers_to_object.params["asset_cfg"] = SceneEntityCfg(
+            "robot", body_names=["palm_link", ".*_tip"]
+        )
+        self.events.reset_robot_wrist_joint.params["asset_cfg"] = SceneEntityCfg("robot", joint_names=["iiwa7_joint_7"])
+
+        self.rewards.position_tracking.params["thumb_contact_name"] = "thumb_link_3"
+        self.rewards.position_tracking.params["tip_contact_names"] = (
+            "index_link_3",
+            "middle_link_3",
+            "ring_link_3",
+        )
+        if self.rewards.orientation_tracking:
+            self.rewards.orientation_tracking.params["thumb_contact_name"] = "thumb_link_3"
+            self.rewards.orientation_tracking.params["tip_contact_names"] = (
+                "index_link_3",
+                "middle_link_3",
+                "ring_link_3",
+            )
+        self.rewards.success.params["thumb_contact_name"] = "thumb_link_3"
+        self.rewards.success.params["tip_contact_names"] = (
+            "index_link_3",
+            "middle_link_3",
+            "ring_link_3",
+        )
 
 
 @configclass

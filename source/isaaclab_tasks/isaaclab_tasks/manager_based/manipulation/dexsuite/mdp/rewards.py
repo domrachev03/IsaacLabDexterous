@@ -20,7 +20,9 @@ if TYPE_CHECKING:
 
 def action_rate_l2_clamped(env: ManagerBasedRLEnv) -> torch.Tensor:
     """Penalize the rate of change of the actions using L2 squared kernel."""
-    return torch.sum(torch.square(env.action_manager.action - env.action_manager.prev_action), dim=1).clamp(-1000, 1000)
+    return torch.sum(torch.square(env.action_manager.action - env.action_manager.prev_action), dim=1).clamp(
+        -1000, 1000
+    )
 
 
 def action_l2_clamped(env: ManagerBasedRLEnv) -> torch.Tensor:
@@ -46,26 +48,27 @@ def object_ee_distance(
     return 1 - torch.tanh(object_ee_distance / std)
 
 
-def contacts(env: ManagerBasedRLEnv, threshold: float) -> torch.Tensor:
+def contacts(
+    env: ManagerBasedRLEnv,
+    threshold: float,
+    thumb_contact_name: str = "thumb_finger_tip",
+    tip_contact_names: tuple[str, ...] = ("index_finger_tip", "middle_finger_tip", "ring_finger_tip"),
+) -> torch.Tensor:
     """Penalize undesired contacts as the number of violations that are above a threshold."""
 
     # FIXME: generalize to different robot arms
-    thumb_contact_sensor: ContactSensor = env.scene.sensors["thumb_link_3_object_s"]
-    index_contact_sensor: ContactSensor = env.scene.sensors["index_link_3_object_s"]
-    middle_contact_sensor: ContactSensor = env.scene.sensors["middle_link_3_object_s"]
-    ring_contact_sensor: ContactSensor = env.scene.sensors["ring_link_3_object_s"]
+    thumb_contact: ContactSensor = env.scene.sensors[f"{thumb_contact_name}_object_s"].data.force_matrix_w.view(
+        env.num_envs, 3
+    )
+    tip_contact: list[ContactSensor] = [
+        env.scene.sensors[f"{link}_object_s"].data.force_matrix_w.view(env.num_envs, 3) for link in tip_contact_names
+    ]
     # check if contact force is above threshold
-    thumb_contact = thumb_contact_sensor.data.force_matrix_w.view(env.num_envs, 3)
-    index_contact = index_contact_sensor.data.force_matrix_w.view(env.num_envs, 3)
-    middle_contact = middle_contact_sensor.data.force_matrix_w.view(env.num_envs, 3)
-    ring_contact = ring_contact_sensor.data.force_matrix_w.view(env.num_envs, 3)
 
     thumb_contact_mag = torch.norm(thumb_contact, dim=-1)
-    index_contact_mag = torch.norm(index_contact, dim=-1)
-    middle_contact_mag = torch.norm(middle_contact, dim=-1)
-    ring_contact_mag = torch.norm(ring_contact, dim=-1)
+    contact_mags = [torch.norm(contact, dim=-1) for contact in tip_contact]
     good_contact_cond1 = (thumb_contact_mag > threshold) & (
-        (index_contact_mag > threshold) | (middle_contact_mag > threshold) | (ring_contact_mag > threshold)
+        torch.stack([mag > threshold for mag in contact_mags], dim=-1).any(dim=-1)
     )
 
     return good_contact_cond1
@@ -78,6 +81,8 @@ def success_reward(
     align_asset_cfg: SceneEntityCfg,
     pos_std: float,
     rot_std: float | None = None,
+    thumb_contact_name: str = "thumb_finger_tip",
+    tip_contact_names: tuple[str, ...] = ("index_finger_tip", "middle_finger_tip", "ring_finger_tip"),
 ) -> torch.Tensor:
     """Reward success by comparing commanded pose to the object pose using tanh kernels on error."""
 
@@ -93,11 +98,21 @@ def success_reward(
         # square is not necessary but this help to keep the final value between having rot_std or not roughly the same
         return (1 - torch.tanh(pos_dist / pos_std)) ** 2
     rot_dist = torch.norm(rot_err, dim=1)
-    return (1 - torch.tanh(pos_dist / pos_std)) * (1 - torch.tanh(rot_dist / rot_std)) * contacts(env, 1.0).float()
+    return (
+        (1 - torch.tanh(pos_dist / pos_std))
+        * (1 - torch.tanh(rot_dist / rot_std))
+        * contacts(env, 1.0, thumb_contact_name, tip_contact_names).float()
+    )
 
 
 def position_command_error_tanh(
-    env: ManagerBasedRLEnv, std: float, command_name: str, asset_cfg: SceneEntityCfg, align_asset_cfg: SceneEntityCfg
+    env: ManagerBasedRLEnv,
+    std: float,
+    command_name: str,
+    asset_cfg: SceneEntityCfg,
+    align_asset_cfg: SceneEntityCfg,
+    thumb_contact_name: str = "thumb_finger_tip",
+    tip_contact_names: tuple[str, ...] = ("index_finger_tip", "middle_finger_tip", "ring_finger_tip"),
 ) -> torch.Tensor:
     """Reward tracking of commanded position using tanh kernel, gated by contact presence."""
 
@@ -108,11 +123,17 @@ def position_command_error_tanh(
     des_pos_b = command[:, :3]
     des_pos_w, _ = combine_frame_transforms(asset.data.root_pos_w, asset.data.root_quat_w, des_pos_b)
     distance = torch.norm(object.data.root_pos_w - des_pos_w, dim=1)
-    return (1 - torch.tanh(distance / std)) * contacts(env, 1.0).float()
+    return (1 - torch.tanh(distance / std)) * contacts(env, 1.0, thumb_contact_name, tip_contact_names).float()
 
 
 def orientation_command_error_tanh(
-    env: ManagerBasedRLEnv, std: float, command_name: str, asset_cfg: SceneEntityCfg, align_asset_cfg: SceneEntityCfg
+    env: ManagerBasedRLEnv,
+    std: float,
+    command_name: str,
+    asset_cfg: SceneEntityCfg,
+    align_asset_cfg: SceneEntityCfg,
+    thumb_contact_name: str = "thumb_finger_tip",
+    tip_contact_names: tuple[str, ...] = ("index_finger_tip", "middle_finger_tip", "ring_finger_tip"),
 ) -> torch.Tensor:
     """Reward tracking of commanded orientation using tanh kernel, gated by contact presence."""
 
@@ -124,4 +145,4 @@ def orientation_command_error_tanh(
     des_quat_w = math_utils.quat_mul(asset.data.root_state_w[:, 3:7], des_quat_b)
     quat_distance = math_utils.quat_error_magnitude(object.data.root_quat_w, des_quat_w)
 
-    return (1 - torch.tanh(quat_distance / std)) * contacts(env, 1.0).float()
+    return (1 - torch.tanh(quat_distance / std)) * contacts(env, 1.0, thumb_contact_name, tip_contact_names).float()

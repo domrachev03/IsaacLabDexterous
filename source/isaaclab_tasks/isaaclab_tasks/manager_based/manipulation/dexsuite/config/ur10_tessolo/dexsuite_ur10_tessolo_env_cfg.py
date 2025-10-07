@@ -36,12 +36,21 @@ class UR10TessoloRelJointPosActionCfg:
 @configclass
 class UR10TessoloReorientRewardCfg(dexsuite.RewardsCfg):
     # bool awarding term if 2 finger tips are in contact with object, one of the contacting fingers has to be thumb.
-    good_finger_contact = RewTerm(
+    finger_contact = RewTerm(
         func=mdp.any_contact,
-        weight=2.0,
+        weight=1.0,
         params={
             "threshold": 1.0,
             "contact_names": ("rl_dg_1_4", "rl_dg_2_4", "rl_dg_3_4", "rl_dg_4_4", "rl_dg_5_4"),
+        },
+    )
+    good_finger_contact = RewTerm(
+        func=mdp.contacts,
+        weight=1.0,
+        params={
+            "threshold": 1.0,
+            "thumb_contact_name": "rl_dg_1_4",
+            "tip_contact_names": ("rl_dg_2_4", "rl_dg_3_4", "rl_dg_4_4", "rl_dg_5_4"),
         },
     )
 
@@ -79,7 +88,9 @@ class UR10TessoloMixinCfg:
         self.rewards.fingers_to_object.params["asset_cfg"] = SceneEntityCfg(
             "robot", body_names=["rl_dg_mount", r"rl_dg_(1|2|3|4|5)_4"]
         )
-        self.events.reset_robot_wrist_joint.params["asset_cfg"] = SceneEntityCfg("robot", joint_names=["wrist_3_joint"])
+        self.events.reset_robot_wrist_joint.params["asset_cfg"] = SceneEntityCfg(
+            "robot", joint_names=["wrist_3_joint"]
+        )
 
         self.rewards.position_tracking.params["thumb_contact_name"] = "rl_dg_1_4"
         self.rewards.position_tracking.params["tip_contact_names"] = (

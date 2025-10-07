@@ -17,7 +17,20 @@ from ... import mdp
 
 @configclass
 class UR10TessoloRelJointPosActionCfg:
-    action = mdp.RelativeJointPositionActionCfg(asset_name="robot", joint_names=[".*"], scale=0.1)
+    # Scale is higher6.
+    action = mdp.RelativeJointPositionActionCfg(
+        asset_name="robot",
+        joint_names=[".*"],
+        scale={
+            "shoulder_pan_joint": 0.1,  # rad
+            "shoulder_lift_joint": 0.1,  # rad
+            "elbow_joint": 0.1,  # rad
+            "wrist_1_joint": 0.1,  # rad
+            "wrist_2_joint": 0.1,  # rad
+            "wrist_3_joint": 0.1,  # rad
+            r"rj_dg_(1|2|3|4|5)_(1|2|3|4)": 6.0,  # deg
+        },
+    )
 
 
 @configclass

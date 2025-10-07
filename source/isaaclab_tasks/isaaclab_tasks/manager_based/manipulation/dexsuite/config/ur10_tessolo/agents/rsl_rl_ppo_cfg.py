@@ -9,7 +9,7 @@ from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlPpoActorCriticCfg, R
 
 
 @configclass
-class DexsuiteUR10TessoloPKukaAllegroPORunnerCfg(RslRlOnPolicyRunnerCfg):
+class DexsuiteUR10TessoloPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 32
     obs_groups = {"policy": ["policy", "proprio", "perception"], "critic": ["policy", "proprio", "perception"]}
     max_iterations = 15000

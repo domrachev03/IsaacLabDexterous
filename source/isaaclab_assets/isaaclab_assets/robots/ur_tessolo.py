@@ -20,7 +20,7 @@ from isaaclab_assets import ISAACLAB_ASSETS_DATA_DIR
 
 UR10_TESSOLO_DELTO_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
-        usd_path=f"{ISAACLAB_ASSETS_DATA_DIR}/robots/URTessoloAlik/ur10e_delto.usd",
+        usd_path=f"{ISAACLAB_ASSETS_DATA_DIR}/robots/URTessoloAlik/ur10e_delto_optimized.usd",
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=False,           # copied from UR10_CFG
             max_depenetration_velocity=5.0,  # copied from UR10_CFG

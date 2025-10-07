@@ -70,3 +70,4 @@ tests/
 # Docker history
 .isaac-lab-docker-history
 !source/isaaclab_assets/data/robots/URTessoloAlik/ur10e_delto.usd
+!source/isaaclab_assets/data/robots/URTessoloAlik/ur10e_delto_optimized.usd

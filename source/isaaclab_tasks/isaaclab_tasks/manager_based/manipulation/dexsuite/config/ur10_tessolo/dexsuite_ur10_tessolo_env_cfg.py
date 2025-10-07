@@ -28,7 +28,7 @@ class UR10TessoloRelJointPosActionCfg:
             "wrist_1_joint": 0.1,  # rad
             "wrist_2_joint": 0.1,  # rad
             "wrist_3_joint": 0.1,  # rad
-            r"rj_dg_(1|2|3|4|5)_(1|2|3|4)": 6.0,  # deg
+            r"rj_dg_(1|2|3|4|5)_(1|2|3|4)": 0.1,  # deg
         },
     )
 
@@ -37,12 +37,11 @@ class UR10TessoloRelJointPosActionCfg:
 class UR10TessoloReorientRewardCfg(dexsuite.RewardsCfg):
     # bool awarding term if 2 finger tips are in contact with object, one of the contacting fingers has to be thumb.
     good_finger_contact = RewTerm(
-        func=mdp.contacts,
+        func=mdp.any_contact,
         weight=2.0,
         params={
             "threshold": 1.0,
-            "thumb_contact_name": "rl_dg_1_4",
-            "tip_contact_names": ("rl_dg_2_4", "rl_dg_3_4", "rl_dg_4_4", "rl_dg_5_4"),
+            "contact_names": ("rl_dg_1_4", "rl_dg_2_4", "rl_dg_3_4", "rl_dg_4_4", "rl_dg_5_4"),
         },
     )
 

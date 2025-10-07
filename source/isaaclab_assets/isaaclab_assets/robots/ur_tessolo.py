@@ -22,12 +22,24 @@ UR10_TESSOLO_DELTO_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
         usd_path=f"{ISAACLAB_ASSETS_DATA_DIR}/robots/URTessoloAlik/ur10e_delto_optimized.usd",
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
-            disable_gravity=False,           # copied from UR10_CFG
-            max_depenetration_velocity=5.0,  # copied from UR10_CFG
+            disable_gravity=True,
+            retain_accelerations=True,
+            linear_damping=0.0,
+            angular_damping=0.0,
+            max_linear_velocity=1000.0,
+            max_angular_velocity=1000.0,
+            max_depenetration_velocity=1000.0,
+        ),
+        articulation_props=sim_utils.ArticulationRootPropertiesCfg(
+            solver_position_iteration_count=32,
+            solver_velocity_iteration_count=1,
+            sleep_threshold=0.005,
+            stabilization_threshold=0.0005,
         ),
         activate_contact_sensors=True,      # copied from UR10_CFG
         # articulation_props can be added/tuned if needed; left minimal to mirror UR10_CFG
         # joint_drive_props defaults to force control in KUKA+Allegro; leaving default here
+        joint_drive_props=sim_utils.JointDrivePropertiesCfg(drive_type="force"),
     ),
     init_state=ArticulationCfg.InitialStateCfg(
         # Copied UR10 initial arm posture (UR10_CFG)

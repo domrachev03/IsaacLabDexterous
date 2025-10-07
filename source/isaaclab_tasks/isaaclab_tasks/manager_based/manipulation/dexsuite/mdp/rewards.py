@@ -47,6 +47,24 @@ def object_ee_distance(
     object_ee_distance = torch.norm(asset_pos - object_pos[:, None, :], dim=-1).max(dim=-1).values
     return 1 - torch.tanh(object_ee_distance / std)
 
+def any_contact(
+    env: ManagerBasedRLEnv,
+    threshold: float,
+    contact_names: tuple[str, ...] = ("thumb_finger_tip", "index_finger_tip", "middle_finger_tip", "ring_finger_tip"),
+) -> torch.Tensor:
+    """Penalize undesired contacts as the number of violations that are above a threshold."""
+
+    # FIXME: generalize to different robot arms
+    tip_contact: list[ContactSensor] = [
+        env.scene.sensors[f"{link}_object_s"].data.force_matrix_w.view(env.num_envs, 3) for link in contact_names
+    ]
+    # check if contact force is above threshold
+
+    contact_mags = [torch.norm(contact, dim=-1) for contact in tip_contact]
+    good_contact_cond1 = torch.stack([mag > threshold for mag in contact_mags], dim=-1).any(dim=-1)
+
+    return good_contact_cond1
+
 
 def contacts(
     env: ManagerBasedRLEnv,

@@ -20,7 +20,7 @@ from isaaclab_assets import ISAACLAB_ASSETS_DATA_DIR
 
 UR10_TESSOLO_DELTO_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
-        usd_path=f"{ISAACLAB_ASSETS_DATA_DIR}/robots/URTessoloAlik/ur10e_delto_optimized.usd",
+        usd_path=f"{ISAACLAB_ASSETS_DATA_DIR}/robots/URTessoloAlik/ur10e_delto_optimized_separate_tips.usd",
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=True,
             retain_accelerations=True,
@@ -54,8 +54,8 @@ UR10_TESSOLO_DELTO_CFG = ArticulationCfg(
             "wrist_2_joint": 0.0,
             "wrist_3_joint": 0.0,
             # Tessolo Delto hand (open pose; adjust as needed):
-            "rj_dg_1_1": 0.5237,
-            "rj_dg_1_2": -1.5708,
+            "rj_dg_1_1": 0.0,
+            "rj_dg_1_2": 0.0,
             r"rj_dg_1_(3|4)": 0.0,
             "rj_dg_2_1": -0.1745,
             "rj_dg_4_1": 0.1745,

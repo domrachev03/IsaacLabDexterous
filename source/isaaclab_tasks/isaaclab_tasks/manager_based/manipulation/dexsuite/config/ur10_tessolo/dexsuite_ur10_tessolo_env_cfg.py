@@ -9,6 +9,7 @@ from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.sensors import ContactSensorCfg
+from isaaclab.managers import EventTermCfg as EventTerm
 from isaaclab.utils import configclass
 
 from ... import dexsuite_env_cfg as dexsuite
@@ -36,29 +37,43 @@ class UR10TessoloRelJointPosActionCfg:
 @configclass
 class UR10TessoloReorientRewardCfg(dexsuite.RewardsCfg):
     # bool awarding term if 2 finger tips are in contact with object, one of the contacting fingers has to be thumb.
-    finger_contact = RewTerm(
-        func=mdp.any_contact,
-        weight=1.0,
-        params={
-            "threshold": 1.0,
-            "contact_names": ("rl_dg_1_4", "rl_dg_2_4", "rl_dg_3_4", "rl_dg_4_4", "rl_dg_5_4"),
-        },
-    )
     good_finger_contact = RewTerm(
-        func=mdp.contacts,
-        weight=1.0,
+        func=mdp.any_contact,
+        weight=2.0,
         params={
             "threshold": 1.0,
-            "thumb_contact_name": "rl_dg_1_4",
-            "tip_contact_names": ("rl_dg_2_4", "rl_dg_3_4", "rl_dg_4_4", "rl_dg_5_4"),
+            "contact_names": ("rl_dg_1_tip", "rl_dg_2_tip", "rl_dg_3_tip", "rl_dg_4_tip", "rl_dg_5_tip"),
         },
     )
+    finger_contact = RewTerm(
+        func=mdp.contacts,
+        weight=2.0,
+        params={
+            "threshold": 1.0,
+            "thumb_contact_name": "rl_dg_1_tip",
+            "tip_contact_names": ("rl_dg_2_tip", "rl_dg_3_tip", "rl_dg_4_tip", "rl_dg_5_tip"),
+        },
+    )    
 
+
+
+@configclass
+class UR10TessoloEventCfg(dexsuite.EventCfg):
+    reset_robot_elbow_joint = EventTerm(
+        func=mdp.reset_joints_by_offset,
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("robot", joint_names="elbow_joint"),
+            "position_range": [-0.2, 0.2],
+            "velocity_range": [0.0, 0.0],
+        },
+    )
 
 @configclass
 class UR10TessoloMixinCfg:
     rewards: UR10TessoloReorientRewardCfg = UR10TessoloReorientRewardCfg()
     actions: UR10TessoloRelJointPosActionCfg = UR10TessoloRelJointPosActionCfg()
+    events: UR10TessoloEventCfg = UR10TessoloEventCfg()
 
     def __post_init__(self: dexsuite.DexsuiteReorientEnvCfg):
         super().__post_init__()
@@ -66,7 +81,7 @@ class UR10TessoloMixinCfg:
         self.scene.robot = UR10_TESSOLO_DELTO_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
         # Replace initial position of UR robot by rotating base around z by 180deg
         self.scene.robot.init_state.rot = (0.0, 0.0, 0.0, 1.0)
-        finger_tip_body_list = ["rl_dg_1_4", "rl_dg_2_4", "rl_dg_3_4", "rl_dg_4_4", "rl_dg_5_4"]
+        finger_tip_body_list = ["rl_dg_1_tip", "rl_dg_2_tip", "rl_dg_3_tip", "rl_dg_4_tip", "rl_dg_5_tip"]
         for link_name in finger_tip_body_list:
             setattr(
                 self.scene,
@@ -83,44 +98,44 @@ class UR10TessoloMixinCfg:
         )
         self.observations.proprio.hand_tips_state_b.params["body_asset_cfg"].body_names = [
             "rl_dg_mount",
-            r"rl_dg_(1|2|3|4|5)_4",
+            r"rl_dg_(1|2|3|4|5)_tip",
         ]
         self.rewards.fingers_to_object.params["asset_cfg"] = SceneEntityCfg(
-            "robot", body_names=["rl_dg_mount", r"rl_dg_(1|2|3|4|5)_4"]
+            "robot", body_names=["rl_dg_mount", r"rl_dg_(1|2|3|4|5)_tip"]
         )
         self.events.reset_robot_wrist_joint.params["asset_cfg"] = SceneEntityCfg(
             "robot", joint_names=["wrist_3_joint"]
         )
 
-        self.rewards.position_tracking.params["thumb_contact_name"] = "rl_dg_1_4"
+        self.rewards.position_tracking.params["thumb_contact_name"] = "rl_dg_1_tip"
         self.rewards.position_tracking.params["tip_contact_names"] = (
-            "rl_dg_2_4",
-            "rl_dg_3_4",
-            "rl_dg_4_4",
-            "rl_dg_5_4",
+            "rl_dg_2_tip",
+            "rl_dg_3_tip",
+            "rl_dg_4_tip",
+            "rl_dg_5_tip",
         )
 
-        self.rewards.position_tracking.params["thumb_contact_name"] = "rl_dg_1_4"
+        self.rewards.position_tracking.params["thumb_contact_name"] = "rl_dg_1_tip"
         self.rewards.position_tracking.params["tip_contact_names"] = (
-            "rl_dg_2_4",
-            "rl_dg_3_4",
-            "rl_dg_4_4",
-            "rl_dg_5_4",
+            "rl_dg_2_tip",
+            "rl_dg_3_tip",
+            "rl_dg_4_tip",
+            "rl_dg_5_tip",
         )
         if self.rewards.orientation_tracking:
-            self.rewards.orientation_tracking.params["thumb_contact_name"] = "rl_dg_1_4"
+            self.rewards.orientation_tracking.params["thumb_contact_name"] = "rl_dg_1_tip"
             self.rewards.orientation_tracking.params["tip_contact_names"] = (
-                "rl_dg_2_4",
-                "rl_dg_3_4",
-                "rl_dg_4_4",
-                "rl_dg_5_4",
+                "rl_dg_2_tip",
+                "rl_dg_3_tip",
+                "rl_dg_4_tip",
+                "rl_dg_5_tip",
             )
-        self.rewards.success.params["thumb_contact_name"] = "rl_dg_1_4"
+        self.rewards.success.params["thumb_contact_name"] = "rl_dg_1_tip"
         self.rewards.success.params["tip_contact_names"] = (
-            "rl_dg_2_4",
-            "rl_dg_3_4",
-            "rl_dg_4_4",
-            "rl_dg_5_4",
+            "rl_dg_2_tip",
+            "rl_dg_3_tip",
+            "rl_dg_4_tip",
+            "rl_dg_5_tip",
         )
 
 

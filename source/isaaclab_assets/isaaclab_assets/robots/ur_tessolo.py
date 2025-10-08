@@ -64,93 +64,79 @@ UR10_TESSOLO_DELTO_CFG = ArticulationCfg(
         },
     ),
     actuators={
-        # 'shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint', 'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint'
-        "shoulder": ImplicitActuatorCfg(
-            joint_names_expr=["shoulder_.*"],
-            stiffness=1320.0,
-            damping=72.6636085,
-            friction=0.0,
-            armature=0.0,
-        ),
-        "elbow": ImplicitActuatorCfg(
-            joint_names_expr=["elbow_joint"],
-            stiffness=600.0,
-            damping=34.64101615,
-            friction=0.0,
-            armature=0.0,
-        ),
-        "wrist": ImplicitActuatorCfg(
-            joint_names_expr=["wrist_.*"],
-            stiffness=216.0,
-            damping=29.39387691,
-            friction=0.0,
-            armature=0.0,
+        "arm": ImplicitActuatorCfg(
+            joint_names_expr=["shoulder_pan_joint",
+                                "shoulder_lift_joint",
+                                "elbow_joint",
+                                "wrist_1_joint",
+                                "wrist_2_joint",
+                                "wrist_3_joint"],
+            velocity_limit=1000.0,
+            effort_limit=870.0,
+            stiffness=800.0,
+            damping=40.0,
         ),
         # "tessolo_hand": ImplicitActuatorCfg(
         #     joint_names_expr=[r"rj_dg_(1|2|3|4|5)_(1|2|3|4)"],
         # ),
+
         "tessolo_hand": ImplicitActuatorCfg(
-            joint_names_expr=[
-                "rj_dg_(1|2|3|4|5)_(1|2|3|4)",
-            ],
-            # USD: float drive:angular:physics:maxForce
-            effort_limit_sim={
-                "rj_dg_(1|2|3|4|5)_(1|2|3|4)": 30.0,
+            joint_names_expr=["rj_dg_.*"],
+            effort_limit={
+                "rj_dg_.*":30
             },
-            # USD: float drive:angular:physics:stiffness
-            # stiffness={
-            #     "rj_dg_1_1": 0.8294013,
-            #     "rj_dg_1_2": 0.6285933,
-            #     "rj_dg_1_3": 0.4585949,
-            #     "rj_dg_1_4": 0.1697713,
-            #     "rj_dg_2_1": 2.4380815,
-            #     "rj_dg_2_2": 0.8276208,
-            #     "rj_dg_2_3": 0.4111692,
-            #     "rj_dg_2_4": 0.0957437,
-            #     "rj_dg_3_1": 2.4535544,
-            #     "rj_dg_3_2": 0.8264341,
-            #     "rj_dg_3_3": 0.4111796,
-            #     "rj_dg_3_4": 0.0957482,
-            #     "rj_dg_4_1": 2.3093047,
-            #     "rj_dg_4_2": 0.8272905,
-            #     "rj_dg_4_3": 0.4109422,
-            #     "rj_dg_4_4": 0.0957327,
-            #     "rj_dg_5_1": 1.7342279,
-            #     "rj_dg_5_2": 1.1074699,
-            #     "rj_dg_5_3": 0.4551452,
-            #     "rj_dg_5_4": 0.1693594,
-            # },
-            # # USD: float drive:angular:physics:damping
-            # damping={
-            #     "rj_dg_1_1": 0.00033176053,
-            #     "rj_dg_1_2": 0.00025143730,
-            #     "rj_dg_1_3": 0.00018343795,
-            #     "rj_dg_1_4": 0.00006790854,
-            #     "rj_dg_2_1": 0.00097523263,
-            #     "rj_dg_2_2": 0.00033104833,
-            #     "rj_dg_2_3": 0.00016446768,
-            #     "rj_dg_2_4": 0.00003829747,
-            #     "rj_dg_3_1": 0.00098142180,
-            #     "rj_dg_3_2": 0.00033057365,
-            #     "rj_dg_3_3": 0.00016447184,
-            #     "rj_dg_3_4": 0.00003829928,
-            #     "rj_dg_4_1": 0.00092372190,
-            #     "rj_dg_4_2": 0.00033091620,
-            #     "rj_dg_4_3": 0.00016437689,
-            #     "rj_dg_4_4": 0.00003829308,
-            #     "rj_dg_5_1": 0.00069369114,
-            #     "rj_dg_5_2": 0.00044298798,
-            #     "rj_dg_5_3": 0.00018205808,
-            #     "rj_dg_5_4": 0.00006774375,
-            # },
-            stiffness= {
-                "rj_dg_(1|2|3|4|5)_(1|2|3|4)": 3.0,
+            stiffness={
+                "rj_dg_1_1": 0.8294,
+                "rj_dg_1_2": 0.62859, 
+                "rj_dg_1_3": 0.45859, 
+                "rj_dg_1_4": 0.16977, 
+
+                "rj_dg_2_1": 2.43808, 
+                "rj_dg_2_2": 0.82762, 
+                "rj_dg_2_3": 0.41117, 
+                "rj_dg_2_4": 0.09574, 
+
+                "rj_dg_3_1": 2.45355, 
+                "rj_dg_3_2": 0.82643,
+                "rj_dg_3_3": 0.41118, 
+                "rj_dg_3_4": 0.09575, 
+
+                "rj_dg_4_1": 2.3093,
+                "rj_dg_4_2": 0.82729,
+                "rj_dg_4_3": 0.41094,
+                "rj_dg_4_4": 0.09573,
+
+                "rj_dg_5_1": 1.73423,
+                "rj_dg_5_2": 1.10747,
+                "rj_dg_5_3": 0.45515,
+                "rj_dg_5_4": 0.16936
             },
             damping={
-                "rj_dg_(1|2|3|4|5)_(1|2|3|4)": 0.1,
-            },
-            friction={
-                "rj_dg_(1|2|3|4|5)_(1|2|3|4)": 0.01,
+         
+                "rj_dg_1_1": 0.05314332,
+                "rj_dg_1_2": 0.02990215, 
+                "rj_dg_1_3": 0.01657904, 
+                "rj_dg_1_4": 0.00270917, 
+
+                "rj_dg_2_1": 0.26783944, 
+                "rj_dg_2_2": 0.0451749, 
+                "rj_dg_2_3": 0.0120614, 
+                "rj_dg_2_4": 0.00088871, 
+
+                "rj_dg_3_1": 0.2703927,
+                "rj_dg_3_2": 0.04507756,
+                "rj_dg_3_3": 0.0125066, 
+                "rj_dg_3_4": 0.00088885, 
+
+                "rj_dg_4_1": 0.24690116,
+                "rj_dg_4_2": 0.04514794,
+                "rj_dg_4_3": 0.01249565,
+                "rj_dg_4_4": 0.00088857,
+
+                "rj_dg_5_1": 0.16547778,
+                "rj_dg_5_2": 0.0699276,
+                "rj_dg_5_3": 0.01639284,
+                "rj_dg_5_4": 0.0026993,
             },
         ),
     },

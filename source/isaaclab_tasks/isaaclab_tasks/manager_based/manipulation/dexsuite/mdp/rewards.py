@@ -164,3 +164,29 @@ def orientation_command_error_tanh(
     quat_distance = math_utils.quat_error_magnitude(object.data.root_quat_w, des_quat_w)
 
     return (1 - torch.tanh(quat_distance / std)) * contacts(env, 1.0, thumb_contact_name, tip_contact_names).float()
+
+def penalize_close_fingers(
+    env: ManagerBasedRLEnv,
+    min_distance: float,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot", body_names=["rj_dg_1_tip", "rj_dg_2_tip", "rj_dg_3_tip", "rj_dg_4_tip", "rj_dg_5_tip"]),
+) -> torch.Tensor:
+    """Penalize the fingers being too close to each other using tanh kernel."""
+    asset: RigidObject = env.scene[asset_cfg.name]
+    finger_tips_pos = asset.data.body_pos_w[:, asset_cfg.body_ids]  # (num_envs, num_fingers, 3)
+    num_fingers = finger_tips_pos.shape[1]
+    if num_fingers < 2:
+        return torch.zeros(env.num_envs, device=env.device)
+    
+    # Compute pairwise distances between finger tips
+    dists = torch.cdist(finger_tips_pos, finger_tips_pos, p=2)  # (num_envs, num_fingers, num_fingers)
+    
+    # Create a mask to ignore self-distances (diagonal elements)
+    mask = torch.eye(num_fingers, device=env.device).bool().unsqueeze(0)  # (1, num_fingers, num_fingers)
+    dists = dists.masked_fill(mask, float('inf')).reshape(dists.shape[0], -1)  # Set self-distances to infinity
+    
+    # Get the minimum distance between any two fingers for each environment
+    min_dists = dists.min(dim=1).values  # (num_envs,)
+
+    # Penalize if the minimum distance is below the threshold
+    rew = torch.clamp(min_distance - min_dists, min=0.0) / min_distance
+    return rew

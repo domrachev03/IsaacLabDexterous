@@ -47,6 +47,7 @@ def object_ee_distance(
     object_ee_distance = torch.norm(asset_pos - object_pos[:, None, :], dim=-1).max(dim=-1).values
     return 1 - torch.tanh(object_ee_distance / std)
 
+
 def any_contact(
     env: ManagerBasedRLEnv,
     threshold: float,
@@ -69,23 +70,23 @@ def any_contact(
 def contacts(
     env: ManagerBasedRLEnv,
     threshold: float,
-    thumb_contact_name: str = "thumb_finger_tip",
+    thumb_contact_name: str | list[str] = "thumb_finger_tip",
     tip_contact_names: tuple[str, ...] = ("index_finger_tip", "middle_finger_tip", "ring_finger_tip"),
 ) -> torch.Tensor:
     """Penalize undesired contacts as the number of violations that are above a threshold."""
-
+    thumb_contact_name = thumb_contact_name if not isinstance(thumb_contact_name, str) else [thumb_contact_name]
     # FIXME: generalize to different robot arms
-    thumb_contact: ContactSensor = env.scene.sensors[f"{thumb_contact_name}_object_s"].data.force_matrix_w.view(
-        env.num_envs, 3
-    )
+    thumb_contact: list[ContactSensor] = [
+        env.scene.sensors[f"{link}_object_s"].data.force_matrix_w.view(env.num_envs, 3) for link in thumb_contact_name
+    ]
     tip_contact: list[ContactSensor] = [
         env.scene.sensors[f"{link}_object_s"].data.force_matrix_w.view(env.num_envs, 3) for link in tip_contact_names
     ]
     # check if contact force is above threshold
 
-    thumb_contact_mag = torch.norm(thumb_contact, dim=-1)
+    thumb_contact_mag = [torch.norm(contact, dim=-1) for contact in thumb_contact]
     contact_mags = [torch.norm(contact, dim=-1) for contact in tip_contact]
-    good_contact_cond1 = (thumb_contact_mag > threshold) & (
+    good_contact_cond1 = torch.stack([mag > threshold for mag in thumb_contact_mag], dim=-1).any(dim=-1) & (
         torch.stack([mag > threshold for mag in contact_mags], dim=-1).any(dim=-1)
     )
 
@@ -99,7 +100,7 @@ def success_reward(
     align_asset_cfg: SceneEntityCfg,
     pos_std: float,
     rot_std: float | None = None,
-    thumb_contact_name: str = "thumb_finger_tip",
+    thumb_contact_name: str | list[str] = "thumb_finger_tip",
     tip_contact_names: tuple[str, ...] = ("index_finger_tip", "middle_finger_tip", "ring_finger_tip"),
 ) -> torch.Tensor:
     """Reward success by comparing commanded pose to the object pose using tanh kernels on error."""
@@ -129,7 +130,7 @@ def position_command_error_tanh(
     command_name: str,
     asset_cfg: SceneEntityCfg,
     align_asset_cfg: SceneEntityCfg,
-    thumb_contact_name: str = "thumb_finger_tip",
+    thumb_contact_name: str | list[str] = "thumb_finger_tip",
     tip_contact_names: tuple[str, ...] = ("index_finger_tip", "middle_finger_tip", "ring_finger_tip"),
 ) -> torch.Tensor:
     """Reward tracking of commanded position using tanh kernel, gated by contact presence."""
@@ -150,7 +151,7 @@ def orientation_command_error_tanh(
     command_name: str,
     asset_cfg: SceneEntityCfg,
     align_asset_cfg: SceneEntityCfg,
-    thumb_contact_name: str = "thumb_finger_tip",
+    thumb_contact_name: str | list[str] = "thumb_finger_tip",
     tip_contact_names: tuple[str, ...] = ("index_finger_tip", "middle_finger_tip", "ring_finger_tip"),
 ) -> torch.Tensor:
     """Reward tracking of commanded orientation using tanh kernel, gated by contact presence."""
@@ -165,10 +166,13 @@ def orientation_command_error_tanh(
 
     return (1 - torch.tanh(quat_distance / std)) * contacts(env, 1.0, thumb_contact_name, tip_contact_names).float()
 
+
 def penalize_close_fingers(
     env: ManagerBasedRLEnv,
     min_distance: float,
-    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot", body_names=["rj_dg_1_tip", "rj_dg_2_tip", "rj_dg_3_tip", "rj_dg_4_tip", "rj_dg_5_tip"]),
+    asset_cfg: SceneEntityCfg = SceneEntityCfg(
+        "robot", body_names=["rj_dg_1_tip", "rj_dg_2_tip", "rj_dg_3_tip", "rj_dg_4_tip", "rj_dg_5_tip"]
+    ),
 ) -> torch.Tensor:
     """Penalize the fingers being too close to each other using tanh kernel."""
     asset: RigidObject = env.scene[asset_cfg.name]
@@ -176,14 +180,14 @@ def penalize_close_fingers(
     num_fingers = finger_tips_pos.shape[1]
     if num_fingers < 2:
         return torch.zeros(env.num_envs, device=env.device)
-    
+
     # Compute pairwise distances between finger tips
     dists = torch.cdist(finger_tips_pos, finger_tips_pos, p=2)  # (num_envs, num_fingers, num_fingers)
-    
+
     # Create a mask to ignore self-distances (diagonal elements)
     mask = torch.eye(num_fingers, device=env.device).bool().unsqueeze(0)  # (1, num_fingers, num_fingers)
-    dists = dists.masked_fill(mask, float('inf')).reshape(dists.shape[0], -1)  # Set self-distances to infinity
-    
+    dists = dists.masked_fill(mask, float("inf")).reshape(dists.shape[0], -1)  # Set self-distances to infinity
+
     # Get the minimum distance between any two fingers for each environment
     min_dists = dists.min(dim=1).values  # (num_envs,)
 

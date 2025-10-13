@@ -87,6 +87,9 @@ UR10_TESSOLO_DELTO_CFG = ArticulationCfg(
             effort_limit_sim={
                 "rj_dg_(1|2|3|4|5)_(1|2|3|4)": 30.0,
             },
+            velocity_limit_sim={
+                "rj_dg_(1|2|3|4|5)_(1|2|3|4)": 10000.0,
+            },
             # USD: float drive:angular:physics:stiffness
             # stiffness={
             #     "rj_dg_1_1": 0.8294013,

@@ -119,6 +119,14 @@ class UR10TessoloMixinCfg:
             "robot", joint_names=["wrist_3_joint"]
         )
 
+        self.rewards.position_tracking.params["thumb_contact_name"] = "rl_dg_1_tip"
+        self.rewards.position_tracking.params["tip_contact_names"] = (
+            "rl_dg_2_tip",
+            "rl_dg_3_tip",
+            "rl_dg_4_tip",
+            "rl_dg_5_tip",
+        )
+
         if self.rewards.orientation_tracking:
             self.rewards.orientation_tracking.params["thumb_contact_name"] = "rl_dg_1_tip"
             self.rewards.orientation_tracking.params["tip_contact_names"] = (

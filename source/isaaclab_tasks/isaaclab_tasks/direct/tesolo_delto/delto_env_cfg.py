@@ -10,11 +10,14 @@ from isaaclab.sim.spawners.materials.physics_materials_cfg import RigidBodyMater
 from isaaclab.sensors import ContactSensorCfg
 from isaaclab.sensors import CameraCfg
 
+from isaaclab.markers.config import RAY_CASTER_MARKER_CFG
+
 # from isaaclab.utils.math import quat_to_rot_mats
 
 ##
 # Configuration
 ##
+from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 
 from .ur_delto_cfg import DELTO_CFG
 
@@ -30,9 +33,9 @@ class DeltoEnvCfg(DirectRLEnvCfg):
     decimation = 2
     episode_length_s = 5.0
     action_space = 20
-    observation_space = 63
+    observation_space = 92 # 63
     state_space = 0
-    action_scale = 1
+    action_scale = 0.1
     asymmetric_obs = False
     obs_type = "full"
     num_env = 32
@@ -113,29 +116,40 @@ class DeltoEnvCfg(DirectRLEnvCfg):
         )
 
     # ======================================================================= objects
+    # https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.0/Isaac/Props/Mugs/SM_Mug_D1.usd
 
     # in-manipulator object
     object_cfg: RigidObjectCfg = RigidObjectCfg(
         prim_path="/World/envs/env_.*/Object",  # один куб на среду
-        spawn=sim_utils.CylinderCfg(  # используем Box вместо Cone
-            radius=0.03,  # кубик 10 см
-            height=0.15,
-            axis="Z",
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-            physics_material=sim_utils.RigidBodyMaterialCfg(static_friction=2.0),
-            mass_props=sim_utils.MassPropertiesCfg(mass=0.3),
-            collision_props=sim_utils.CollisionPropertiesCfg(),
-            visual_material=sim_utils.PreviewSurfaceCfg(
-                diffuse_color=(1.0, 0.0, 0.0),  # красный
-                metallic=0.1,
+        spawn=sim_utils.UsdFileCfg(
+                # usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/YCB/Axis_Aligned/035_power_drill.usd",
+                usd_path=f"robots/objects/Mug.usd",
+                rigid_props=sim_utils.RigidBodyPropertiesCfg(
+                    disable_gravity=False,
+                    retain_accelerations=True,
+                    max_depenetration_velocity=1000.0,
+                ),
             ),
-        ),
+        # spawn=sim_utils.CylinderCfg(  # используем Box вместо Cone
+        #     radius=0.03,  # кубик 10 см
+        #     height=0.15,
+        #     axis="Z",
+        #     rigid_props=sim_utils.RigidBodyPropertiesCfg(),
+        #     physics_material=sim_utils.RigidBodyMaterialCfg(static_friction=2.0),
+        #     mass_props=sim_utils.MassPropertiesCfg(mass=0.3),
+        #     collision_props=sim_utils.CollisionPropertiesCfg(),
+        #     visual_material=sim_utils.PreviewSurfaceCfg(
+        #         diffuse_color=(0.0, 1.0, 0.0),  # красный
+        #         metallic=0.1,
+        #     ),
+        # ),
         init_state=RigidObjectCfg.InitialStateCfg(
-            pos=(0.23, -0.83, 0.1 + 0.15/2),
+            pos=(0.23, -0.83, 0.1),
+            rot=(0.7071, 0, 0, -0.7071)
             # pos=(0.22, -1.0, 0.1),
         ),
     )
-    
+
     table_cfg: RigidObjectCfg = RigidObjectCfg(
             prim_path="/World/envs/env_.*/Table",  # один куб на среду
             spawn=sim_utils.CuboidCfg(  # используем Box вместо Cone
@@ -201,6 +215,10 @@ class DeltoEnvCfg(DirectRLEnvCfg):
     #     ),
     #     offset=CameraCfg.OffsetCfg(pos=(0.3, 0.0, 0.2), rot=(0, 0, 0, 1), convention="world"),
     # )
+
+    ray_cfg = RAY_CASTER_MARKER_CFG.replace(prim_path="/Visuals/ObservationPointCloud")
+    ray_cfg.markers["hit"].radius = 0.0025  # размер сфер
+    
 
     # ======================================================================= scene
 

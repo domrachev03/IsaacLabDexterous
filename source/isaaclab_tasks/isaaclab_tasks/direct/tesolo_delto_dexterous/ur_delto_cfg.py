@@ -12,7 +12,7 @@ from isaaclab.actuators import ImplicitActuatorCfg
 DELTO_CFG = ArticulationCfg(
     # prim_path = "/World/envs/env_.*/Robot",
     spawn=sim_utils.UsdFileCfg(
-        usd_path=f"robots/dg5f_right/ur10e_delto_camera.usd",
+        usd_path=f"robots/dg5f_right/ur10e_delto_optimized_separate_tips.usd",
         activate_contact_sensors=True,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=False,
@@ -37,11 +37,11 @@ DELTO_CFG = ArticulationCfg(
     init_state=ArticulationCfg.InitialStateCfg(
         pos=(0.0, 0.0, 0.0),
         joint_pos={"shoulder_pan_joint": -90.0 *torch.pi/180,
-                    "shoulder_lift_joint": -75.0 *torch.pi/180,
-                    "elbow_joint": 120.0 *torch.pi/180,
-                    "wrist_1_joint": -50.0 *torch.pi/180,
+                    "shoulder_lift_joint": -90.0 *torch.pi/180,
+                    "elbow_joint": 100.0 *torch.pi/180,
+                    "wrist_1_joint": -10.0 *torch.pi/180,
                     "wrist_2_joint": 90.0 *torch.pi/180,
-                    "wrist_3_joint": -90.0 *torch.pi/180,
+                    "wrist_3_joint": 0.0 *torch.pi/180,
                     "rj_dg_.*": 0.0
                 },
     ),

@@ -7,7 +7,7 @@ from . import agents
 ##
 
 gym.register(
-    id="Isaac-Tesolo-Delto-Direct-v0",
+    id="Isaac-Tesolo-Delto-Direct-D",
     entry_point=f"{__name__}.delto_env:DeltoEnv",
     disable_env_checker=True,
     kwargs={

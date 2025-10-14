@@ -49,7 +49,7 @@ class UR10TessoloReorientRewardCfg(dexsuite.RewardsCfg):
         func=mdp.contacts,
         weight=2.0,
         params={
-            "threshold": 2.0,
+            "threshold": 1.0,
             "thumb_contact_name": "rl_dg_1_tip",
             "tip_contact_names": ("rl_dg_2_tip", "rl_dg_3_tip", "rl_dg_4_tip", "rl_dg_5_tip"),
         },

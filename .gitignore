@@ -72,3 +72,4 @@ tests/
 !source/isaaclab_assets/data/robots/URTessoloAlik/ur10e_delto.usd
 !source/isaaclab_assets/data/robots/URTessoloAlik/ur10e_delto_optimized.usd
 !source/isaaclab_assets/data/robots/URTessoloAlik/ur10e_delto_optimized_separate_tips.usd
+!source/isaaclab_assets/data/robots/URTessoloAlik/ur10e_delto_optimized_separate_tips_limited_jnts.usd

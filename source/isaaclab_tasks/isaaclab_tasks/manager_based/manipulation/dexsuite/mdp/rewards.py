@@ -167,12 +167,12 @@ def orientation_command_error_tanh(
     return (1 - torch.tanh(quat_distance / std)) * contacts(env, 1.0, thumb_contact_name, tip_contact_names).float()
 
 
-def penalize_close_fingers(
+def finger_distance_tanh(
     env: ManagerBasedRLEnv,
-    min_distance: float,
-    asset_cfg: SceneEntityCfg = SceneEntityCfg(
-        "robot", body_names=["rj_dg_1_tip", "rj_dg_2_tip", "rj_dg_3_tip", "rj_dg_4_tip", "rj_dg_5_tip"]
-    ),
+    asset_cfg: SceneEntityCfg,
+    std: float,
+    thumb_contact_name: str | list[str] = "thumb_finger_tip",
+    tip_contact_names: tuple[str, ...] = ("index_finger_tip", "middle_finger_tip", "ring_finger_tip"),
 ) -> torch.Tensor:
     """Penalize the fingers being too close to each other using tanh kernel."""
     asset: RigidObject = env.scene[asset_cfg.name]
@@ -191,6 +191,4 @@ def penalize_close_fingers(
     # Get the minimum distance between any two fingers for each environment
     min_dists = dists.min(dim=1).values  # (num_envs,)
 
-    # Penalize if the minimum distance is below the threshold
-    rew = torch.clamp(min_distance - min_dists, min=0.0) / min_distance
-    return rew
+    return torch.tanh(min_dists / std) * contacts(env, 1.0, thumb_contact_name, tip_contact_names).float()

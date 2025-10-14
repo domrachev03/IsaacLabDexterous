@@ -66,16 +66,26 @@ class UR10TessoloReorientRewardCfg(dexsuite.RewardsCfg):
     #         "tip_contact_names": ("rl_dg_2_tip", "rl_dg_3_tip", "rl_dg_4_tip"),
     #     },
     # )
-    contact_finger_dist = RewTerm(
-        func=mdp.finger_distance_tanh,
-        weight=3.0,
+    # contact_finger_dist = RewTerm(
+    #     func=mdp.finger_distance_tanh,
+    #     weight=3.0,
+    #     params={
+    #         "std": 0.3,
+    #         "asset_cfg": SceneEntityCfg("robot", body_names=[r"rl_dg_(1|2|3|4|5)_tip"]),
+    #         "thumb_contact_name": "rl_dg_1_tip",
+    #         "tip_contact_names": ("rl_dg_2_tip", "rl_dg_3_tip", "rl_dg_4_tip", "rl_dg_5_tip"),
+    #     },
+    # )
+    thumb_distance = RewTerm(
+        func=mdp.thumb2finger_distance_tanh,
+        weight=0.2,
         params={
-            "std": 0.3,
-            "asset_cfg": SceneEntityCfg("robot", body_names=["rl_dg_mount", r"rl_dg_(1|2|3|4|5)_tip"]),
-            "thumb_contact_name": "rl_dg_1_tip",
-            "tip_contact_names": ("rl_dg_2_tip", "rl_dg_3_tip", "rl_dg_4_tip", "rl_dg_5_tip"),
-        },
+            "std": 0.1,
+            "thumb_asset_cfg": SceneEntityCfg("robot", body_names=["rl_dg_1_tip"]),
+            "tip_asset_cfg": SceneEntityCfg("robot", body_names=["rl_dg_2_tip", "rl_dg_3_tip", "rl_dg_4_tip", "rl_dg_5_tip"]),
+        }
     )
+
 
 
 

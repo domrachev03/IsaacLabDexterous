@@ -192,3 +192,22 @@ def finger_distance_tanh(
     min_dists = dists.min(dim=1).values  # (num_envs,)
 
     return torch.tanh(min_dists / std) * contacts(env, 1.0, thumb_contact_name, tip_contact_names).float()
+
+
+def thumb2finger_distance_tanh(
+    env: ManagerBasedRLEnv,
+    std: float,
+    thumb_asset_cfg: SceneEntityCfg = SceneEntityCfg("robot", body_names=["thumb_finger_tip"]),
+    tip_asset_cfg: SceneEntityCfg = SceneEntityCfg("robot", body_names=["index_finger_tip", "middle_finger_tip", "ring_finger_tip"]),
+) -> torch.Tensor:
+    """Penalize the thumb being too far from other fingers using tanh kernel."""
+    thumb_obj: RigidObject = env.scene[thumb_asset_cfg.name]
+    thumb_pos = thumb_obj.data.body_pos_w[:, thumb_asset_cfg.body_ids]
+
+    tip_asset: RigidObject = env.scene[tip_asset_cfg.name]
+    tip_pos = tip_asset.data.body_pos_w[:, tip_asset_cfg.body_ids]  # (num_envs, num_tips, 3)
+
+    # Compute distances between thumb and each finger tip
+    dists = torch.cdist(thumb_pos, tip_pos, p=2).squeeze(1)  # (num_envs, num_tips)
+    min_dists = dists.min(dim=1).values  # (num_envs,)
+    return torch.tanh(min_dists / std)

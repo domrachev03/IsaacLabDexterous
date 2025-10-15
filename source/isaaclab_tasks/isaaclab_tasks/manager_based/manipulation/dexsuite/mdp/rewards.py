@@ -211,3 +211,16 @@ def thumb2finger_distance_tanh(
     dists = torch.cdist(thumb_pos, tip_pos, p=2).squeeze(1)  # (num_envs, num_tips)
     min_dists = dists.min(dim=1).values  # (num_envs,)
     return torch.tanh(min_dists / std)
+
+
+def table_contact_penalty(
+    env: ManagerBasedRLEnv,
+    table_contact_name: str = "table_s",
+    threshold: float = 0.1,
+) -> torch.Tensor:
+    """Penalize contacts between the robot and the table above a threshold."""
+    table_contact: ContactSensor = env.scene.sensors[table_contact_name]
+    contact_force = table_contact.data.force_matrix_w.view(env.num_envs, 3)
+    contact_mag = torch.norm(contact_force, dim=-1)
+    contact_penalty = (contact_mag > threshold).float()
+    return contact_penalty

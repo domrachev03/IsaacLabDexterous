@@ -118,6 +118,7 @@ class UR10TessoloMixinCfg:
         self.commands.object_pose.body_name = "rl_dg_mount"
         self.scene.robot = UR10_TESSOLO_DELTO_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
         # Replace initial position of UR robot by rotating base around z by 180deg
+        self.scene.robot.init_state.rot = (0.0, 0.0, 0.0, 1.0)
         finger_tip_body_list = ["rl_dg_1_tip", "rl_dg_2_tip", "rl_dg_3_tip", "rl_dg_4_tip", "rl_dg_5_tip"]
         for link_name in finger_tip_body_list:
             setattr(

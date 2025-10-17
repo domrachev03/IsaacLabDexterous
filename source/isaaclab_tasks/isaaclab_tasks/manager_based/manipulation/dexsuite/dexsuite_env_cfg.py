@@ -73,6 +73,7 @@ class SceneCfg(InteractiveSceneCfg):
             collision_props=sim_utils.CollisionPropertiesCfg(),
             # trick: we let visualizer's color to show the table with success coloring
             visible=False,
+            activate_contact_sensors=True,
         ),
         init_state=RigidObjectCfg.InitialStateCfg(pos=(-0.55, 0.0, 0.235), rot=(1.0, 0.0, 0.0, 0.0)),
     )
@@ -105,7 +106,7 @@ class CommandsCfg:
         resampling_time_range=(3.0, 5.0),
         debug_vis=False,
         ranges=mdp.ObjectUniformPoseCommandCfg.Ranges(
-            pos_x=(-0.7, -0.3),
+            pos_x=(0.3, 0.7),
             pos_y=(-0.25, 0.25),
             pos_z=(0.55, 0.95),
             roll=(-3.14, 3.14),
@@ -340,6 +341,8 @@ class RewardsCfg:
             "std": 0.2,
             "command_name": "object_pose",
             "align_asset_cfg": SceneEntityCfg("object"),
+            "thumb_contact_name": "thumb_finger_tip",
+            "tip_contact_names": ("index_finger_tip", "middle_finger_tip", "ring_finger_tip"),
         },
     )
 
@@ -351,6 +354,8 @@ class RewardsCfg:
             "std": 1.5,
             "command_name": "object_pose",
             "align_asset_cfg": SceneEntityCfg("object"),
+            "thumb_contact_name": "thumb_finger_tip",
+            "tip_contact_names": ("index_finger_tip", "middle_finger_tip", "ring_finger_tip"),
         },
     )
 
@@ -363,6 +368,8 @@ class RewardsCfg:
             "rot_std": 0.5,
             "command_name": "object_pose",
             "align_asset_cfg": SceneEntityCfg("object"),
+            "thumb_contact_name": "thumb_finger_tip",
+            "tip_contact_names": ("index_finger_tip", "middle_finger_tip", "ring_finger_tip"),
         },
     )
 
@@ -431,7 +438,6 @@ class DexsuiteReorientEnvCfg(ManagerBasedEnvCfg):
         if self.curriculum is not None:
             self.curriculum.adr.params["pos_tol"] = self.rewards.success.params["pos_std"] / 2
             self.curriculum.adr.params["rot_tol"] = self.rewards.success.params["rot_std"] / 2
-
 
 class DexsuiteLiftEnvCfg(DexsuiteReorientEnvCfg):
     """Dexsuite lift task definition"""

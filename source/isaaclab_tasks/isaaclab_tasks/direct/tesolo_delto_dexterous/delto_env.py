@@ -65,7 +65,7 @@ class DeltoEnv(DirectRLEnv):
 
         # -------------------------------------------
 
-        self.contact_treshold = 10.
+        self.contact_treshold = 1.5
 
         # -------------------------------------------
 
@@ -192,22 +192,25 @@ class DeltoEnv(DirectRLEnv):
 
         # 1) Расстояние
         object_distance = (fpose - object_com.unsqueeze(1)).norm(dim=2).max(dim=1).values
-        r_approach = 2.0 * (1 - torch.tanh(object_distance / 0.5))
+        # r_approach = 1.0 * (1 - torch.tanh(object_distance / 0.5))
+        r_approach = -1.0 * object_distance
 
         # 2) Контакты
         active_cnt = (flags > 0.5).float().sum(dim=1)
         r_contact_hold = 0.3 * active_cnt
+
+        # print(active_cnt)
 
         # 3) Награда за высоту
         obj_r_h = self.object.data.default_root_state[:,2]
         # obj_h = torch.abs(object_com[:, 2] - obj_r_h)
         obj_dh = object_com[:, 2] - obj_r_h
         obj_h = torch.where(obj_dh > 0.0, obj_dh, 0.0)
-        r_h = 1.0 * torch.tanh(obj_h / self.cfg.success_height)
+        r_h = 2.0 * torch.tanh(obj_h / self.cfg.success_height) * (active_cnt == 3).float()
 
         # 4) Штраф за силу сжатия
         max_fforce, _ = torch.max(fforce, dim=1)
-        max_fforce_treshed = torch.where(max_fforce > 25.0, max_fforce, 0.0)
+        max_fforce_treshed = torch.where(max_fforce > 15.0, max_fforce, 0.0)
         force_penalty = -1.0 * max_fforce_treshed
 
         # 5) Штраф за скорость 
@@ -230,7 +233,7 @@ class DeltoEnv(DirectRLEnv):
 
         termination_mask = self._check_termination()
 
-        rew = rew + 30.0 * success_mask.float() + -10.0 * termination_mask.float()
+        rew = rew + 30.0 * success_mask.float() + -100.0 * termination_mask.float()
 
         # print("rew ", rew)
         # print("r_approach ", r_approach)
@@ -352,7 +355,7 @@ class DeltoEnv(DirectRLEnv):
         
         # Примеры допустимых границ
         x_min, x_max = -0.5, 0.5
-        y_min, y_max = -1.35, -0.35
+        y_min, y_max = -1.1, -0.6
         z_min, z_max = 0.0, 1.5
 
         out_of_bounds = (

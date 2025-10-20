@@ -82,13 +82,18 @@ def contacts(
     tip_contact: list[ContactSensor] = [
         env.scene.sensors[f"{link}_object_s"].data.force_matrix_w.view(env.num_envs, 3) for link in tip_contact_names
     ]
-    # check if contact force is above threshold
+    contact: list[ContactSensor] = thumb_contact + tip_contact
+    # Return true if any two fingers are in contact
+    good_contact_cond1 = torch.stack(
+        [torch.norm(contact_sensor, dim=-1) > threshold for contact_sensor in contact], dim=-1
+    ).sum(dim=-1) >= 2
 
-    thumb_contact_mag = [torch.norm(contact, dim=-1) for contact in thumb_contact]
-    contact_mags = [torch.norm(contact, dim=-1) for contact in tip_contact]
-    good_contact_cond1 = torch.stack([mag > threshold for mag in thumb_contact_mag], dim=-1).any(dim=-1) & (
-        torch.stack([mag > threshold for mag in contact_mags], dim=-1).any(dim=-1)
-    )
+    # check if contact force is above threshold
+    # thumb_contact_mag = [torch.norm(contact, dim=-1) for contact in thumb_contact]
+    # contact_mags = [torch.norm(contact, dim=-1) for contact in tip_contact]
+    # good_contact_cond1 = torch.stack([mag > threshold for mag in thumb_contact_mag], dim=-1).any(dim=-1) & (
+    #     torch.stack([mag > threshold for mag in contact_mags], dim=-1).any(dim=-1)
+    # )
 
     return good_contact_cond1
 
@@ -217,10 +222,12 @@ def table_contact_penalty(
     env: ManagerBasedRLEnv,
     table_contact_name: str = "table_s",
     threshold: float = 0.1,
+    thumb_asset_cfg: str | list[str] = "thumb_finger_tip",
+    tip_asset_cfg: list[str] = ["index_finger_tip", "middle_finger_tip", "ring_finger_tip"],
 ) -> torch.Tensor:
     """Penalize contacts between the robot and the table above a threshold."""
     table_contact: ContactSensor = env.scene.sensors[table_contact_name]
     contact_force = table_contact.data.force_matrix_w.view(env.num_envs, 3)
     contact_mag = torch.norm(contact_force, dim=-1)
     contact_penalty = (contact_mag > threshold).float()
-    return contact_penalty
+    return contact_penalty * contacts(env, 1.0, thumb_asset_cfg, tip_asset_cfg).float()

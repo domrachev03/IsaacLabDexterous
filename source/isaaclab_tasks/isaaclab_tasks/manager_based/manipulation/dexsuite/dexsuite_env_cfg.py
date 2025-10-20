@@ -73,7 +73,6 @@ class SceneCfg(InteractiveSceneCfg):
             collision_props=sim_utils.CollisionPropertiesCfg(),
             # trick: we let visualizer's color to show the table with success coloring
             visible=False,
-            activate_contact_sensors=True,
         ),
         init_state=RigidObjectCfg.InitialStateCfg(pos=(-0.55, 0.0, 0.235), rot=(1.0, 0.0, 0.0, 0.0)),
     )
@@ -106,7 +105,7 @@ class CommandsCfg:
         resampling_time_range=(3.0, 5.0),
         debug_vis=False,
         ranges=mdp.ObjectUniformPoseCommandCfg.Ranges(
-            pos_x=(0.3, 0.7),
+            pos_x=(-0.7, -0.3),
             pos_y=(-0.25, 0.25),
             pos_z=(0.55, 0.95),
             roll=(-3.14, 3.14),

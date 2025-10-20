@@ -94,6 +94,10 @@ class UR10TessoloReorientRewardCfg(dexsuite.RewardsCfg):
     #     },
     # )
 
+    # action_l2 = RewTerm(func=mdp.action_l2_clamped, weight=-0.002)
+
+    # action_rate_l2 = RewTerm(func=mdp.action_rate_l2_clamped, weight=-0.002)
+
 
 @configclass
 class UR10TessoloEventCfg(dexsuite.EventCfg):
@@ -118,8 +122,14 @@ class UR10TessoloMixinCfg:
         super().__post_init__()
         self.commands.object_pose.body_name = "rl_dg_mount"
         self.scene.robot = UR10_TESSOLO_DELTO_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+
         # Replace initial position of UR robot by rotating base around z by 180deg
         self.scene.robot.init_state.rot = (0.0, 0.0, 0.0, 1.0)
+        # Rotate command frame to align with robot base frame
+        self.commands.object_pose.ranges.pos_x = (0.3, 0.7)
+        # Enable contact with table for table_contact_penalty
+        # self.scene.table.spawn.activate_contact_sensors = True
+
         # finger_tip_body_list = ["rl_dg_1_tip", "rl_dg_2_tip", "rl_dg_3_tip", "rl_dg_4_tip", "rl_dg_5_tip"]
         finger_tip_body_list = ["rl_dg_1_4", "rl_dg_2_4", "rl_dg_3_4", "rl_dg_4_4", "rl_dg_5_4"]
         for link_name in finger_tip_body_list:

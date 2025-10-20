@@ -128,7 +128,7 @@ class UR10TessoloMixinCfg:
         # Rotate command frame to align with robot base frame
         self.commands.object_pose.ranges.pos_x = (0.3, 0.7)
         # Enable contact with table for table_contact_penalty
-        # self.scene.table.spawn.activate_contact_sensors = True
+        self.scene.table.spawn.activate_contact_sensors = True
 
         # finger_tip_body_list = ["rl_dg_1_tip", "rl_dg_2_tip", "rl_dg_3_tip", "rl_dg_4_tip", "rl_dg_5_tip"]
         finger_tip_body_list = ["rl_dg_1_4", "rl_dg_2_4", "rl_dg_3_4", "rl_dg_4_4", "rl_dg_5_4"]

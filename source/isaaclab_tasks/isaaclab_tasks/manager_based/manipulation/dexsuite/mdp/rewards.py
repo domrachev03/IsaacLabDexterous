@@ -82,18 +82,12 @@ def contacts(
     tip_contact: list[ContactSensor] = [
         env.scene.sensors[f"{link}_object_s"].data.force_matrix_w.view(env.num_envs, 3) for link in tip_contact_names
     ]
-    contact: list[ContactSensor] = thumb_contact + tip_contact
-    # Return true if any two fingers are in contact
-    good_contact_cond1 = torch.stack(
-        [torch.norm(contact_sensor, dim=-1) > threshold for contact_sensor in contact], dim=-1
-    ).sum(dim=-1) >= 2
-
     # check if contact force is above threshold
-    # thumb_contact_mag = [torch.norm(contact, dim=-1) for contact in thumb_contact]
-    # contact_mags = [torch.norm(contact, dim=-1) for contact in tip_contact]
-    # good_contact_cond1 = torch.stack([mag > threshold for mag in thumb_contact_mag], dim=-1).any(dim=-1) & (
-    #     torch.stack([mag > threshold for mag in contact_mags], dim=-1).any(dim=-1)
-    # )
+    thumb_contact_mag = [torch.norm(contact, dim=-1) for contact in thumb_contact]
+    contact_mags = [torch.norm(contact, dim=-1) for contact in tip_contact]
+    good_contact_cond1 = torch.stack([mag > threshold for mag in thumb_contact_mag], dim=-1).any(dim=-1) & (
+        torch.stack([mag > threshold for mag in contact_mags], dim=-1).any(dim=-1)
+    )
 
     return good_contact_cond1
 

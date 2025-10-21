@@ -54,9 +54,9 @@ UR10_TESSOLO_DELTO_CFG = ArticulationCfg(
             "wrist_2_joint": 0.0,
             "wrist_3_joint": 0.0,
             # Tessolo Delto hand (open pose; adjust as needed):
-            "rj_dg_1_1": 0.35,
+            "rj_dg_1_1": 0.0,
             "rj_dg_1_2": -1.5707,
-            r"rj_dg_1_(3|4)": 0.5236,
+            r"rj_dg_1_(3|4)": 0.0,
             "rj_dg_2_1": -0.348,
             "rj_dg_3_1": 0.0,
             "rj_dg_4_1": 0.261,

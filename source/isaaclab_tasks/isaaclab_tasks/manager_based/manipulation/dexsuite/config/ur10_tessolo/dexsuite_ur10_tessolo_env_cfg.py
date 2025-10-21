@@ -47,11 +47,10 @@ class UR10TessoloReorientRewardCfg(dexsuite.RewardsCfg):
     # )
     good_finger_contact = RewTerm(
         func=mdp.contacts,
-        weight=0.5,
+        weight=3.0,
         params={
             "threshold": 1.0,
             "thumb_contact_name": "rl_dg_1_tip",
-            # "tip_contact_names": ("rl_dg_2_tip", "rl_dg_3_tip", "rl_dg_4_tip", "rl_dg_5_tip"),
             "tip_contact_names": ("rl_dg_2_tip", "rl_dg_3_tip", "rl_dg_4_tip", "rl_dg_5_tip"),
         },
     )
@@ -132,8 +131,8 @@ class UR10TessoloMixinCfg:
         # Enable contact with table for table_contact_penalty
         # self.scene.table.spawn.activate_contact_sensors = True
 
-        self.thumb_contact_name = "rl_dg_1_tip"
-        self.tip_contact_names = ("rl_dg_2_tip", "rl_dg_3_tip", "rl_dg_4_tip", "rl_dg_5_tip")
+        self.thumb_contact_name = ("rl_dg_1_tip", "rl_dg_5_tip")
+        self.tip_contact_names = ("rl_dg_2_tip", "rl_dg_3_tip", "rl_dg_4_tip")
 
         # finger_tip_body_list = ["rl_dg_1_tip", "rl_dg_2_tip", "rl_dg_3_tip", "rl_dg_4_tip", "rl_dg_5_tip"]
         finger_tip_body_list = ["rl_dg_1_tip", "rl_dg_2_tip", "rl_dg_3_tip", "rl_dg_4_tip", "rl_dg_5_tip"]
@@ -162,7 +161,7 @@ class UR10TessoloMixinCfg:
             r"rl_dg_(1|2|3|4|5)_tip",
         ]
         self.rewards.fingers_to_object.params["asset_cfg"] = SceneEntityCfg(
-            "robot", body_names=["rl_dg_mount", r"rl_dg_(1|2|3|4|5)_tip"]
+            "robot", body_names=[r"rl_dg_(1|2|3|4|5)_tip"]
         )
         self.events.reset_robot_wrist_joint.params["asset_cfg"] = SceneEntityCfg(
             "robot", joint_names=["wrist_3_joint"]

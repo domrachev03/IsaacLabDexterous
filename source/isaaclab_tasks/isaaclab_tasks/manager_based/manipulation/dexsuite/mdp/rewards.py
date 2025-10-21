@@ -225,3 +225,19 @@ def table_contact_penalty(
     contact_mag = torch.norm(contact_force, dim=-1)
     contact_penalty = (contact_mag > threshold).float()
     return contact_penalty * contacts(env, 1.0, thumb_asset_cfg, tip_asset_cfg).float()
+
+
+def object_upward_velocity_bonus(
+    env: ManagerBasedRLEnv,
+    std: float,
+    threshold: float = 0.1,
+    thumb_contact_name: str | list[str] = "thumb_finger_tip",
+    tip_contact_names: tuple[str, ...] = ("index_finger_tip", "middle_finger_tip", "ring_finger_tip"),
+) -> torch.Tensor:
+    """Reward upward motion of the object when in stable finger contact."""
+    object_: RigidObject = env.scene["object"]
+    vel_z = object_.data.root_lin_vel_w[:, 2]
+    scale = max(std, 1.0e-6)
+    reward = torch.tanh(vel_z / scale)
+    contact_mask = contacts(env, threshold, thumb_contact_name, tip_contact_names).float()
+    return reward * contact_mask

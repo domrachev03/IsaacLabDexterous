@@ -37,62 +37,27 @@ class UR10TessoloRelJointPosActionCfg:
 @configclass
 class UR10TessoloReorientRewardCfg(dexsuite.RewardsCfg):
     # bool awarding term if 2 finger tips are in contact with object, one of the contacting fingers has to be thumb.
-    # good_finger_contact = RewTerm(
-    #     func=mdp.any_contact,
-    #     weight=2.0,
-    #     params={
-    #         "threshold": 1.0,
-    #         "contact_names": ("rl_dg_1_tip", "rl_dg_2_tip", "rl_dg_3_tip", "rl_dg_4_tip", "rl_dg_5_tip"),
-    #     },
-    # )
     good_finger_contact = RewTerm(
         func=mdp.contacts,
-        weight=3.0,
+        weight=2.0,
         params={
-            "threshold": 1.0,
-            "thumb_contact_name": "rl_dg_1_tip",
-            "tip_contact_names": ("rl_dg_2_tip", "rl_dg_3_tip", "rl_dg_4_tip", "rl_dg_5_tip"),
+            "threshold": 0.2,
         },
     )
-    # position_tracking = RewTerm(
-    #     func=mdp.position_command_error_tanh,
-    #     weight=8.0,
-    #     params={
-    #         "asset_cfg": SceneEntityCfg("robot"),
-    #         "std": 0.1,
-    #         "command_name": "object_pose",
-    #         "align_asset_cfg": SceneEntityCfg("object"),
-    #         "thumb_contact_name": "rl_dg_1_tip",
-    #         "tip_contact_names": ("rl_dg_2_tip", "rl_dg_3_tip", "rl_dg_4_tip", "rl_dg_5_tip"),
-    #     },
-    # )
-    # contact_finger_dist = RewTerm(
-    #     func=mdp.finger_distance_tanh,
-    #     weight=3.0,
-    #     params={
-    #         "std": 0.3,
-    #         "asset_cfg": SceneEntityCfg("robot", body_names=[r"rl_dg_(1|2|4|5)_tip"]),
-    #         "thumb_contact_name": "rl_dg_1_tip",
-    #         "tip_contact_names": ("rl_dg_2_tip", "rl_dg_3_tip", "rl_dg_4_tip", "rl_dg_5_tip"),
-    #     },
-    # )
-    # thumb_distance = RewTerm(
-    #     func=mdp.thumb2finger_distance_tanh,
-    #     weight=0.2,
-    #     params={
-    #         "std": 0.1,
-    #         "thumb_asset_cfg": SceneEntityCfg("robot", body_names=["rl_dg_1_tip"]),
-    #         "tip_asset_cfg": SceneEntityCfg("robot", body_names=["rl_dg_2_tip", "rl_dg_3_tip", "rl_dg_4_tip", "rl_dg_5_tip"]),
-    #     }
-    # )
+    any_finger_contact = RewTerm(
+        func=mdp.any_contact,
+        weight=1.0,
+        params={
+            "threshold": 0.2,
+        },
+    )
+
     table_contact_penalty = RewTerm(
         func=mdp.table_contact_penalty,
         weight=-0.5,
         params={
             "table_contact_name": "table_s",
             "threshold": 0.2,
-            "thumb_asset_cfg": ("rl_dg_1_tip", "rl_dg_5_tip"),
-            "tip_asset_cfg": ["rl_dg_2_tip", "rl_dg_3_tip", "rl_dg_4_tip"],
         },
     )
 
@@ -103,14 +68,8 @@ class UR10TessoloReorientRewardCfg(dexsuite.RewardsCfg):
             "std": 0.2,
             "threshold": 0.2,
             "thumb_contact_name": "rl_dg_1_tip",
-            "tip_contact_names": ("rl_dg_2_tip", "rl_dg_3_tip", "rl_dg_4_tip", "rl_dg_5_tip"),
         },
     )
-
-    # action_l2 = RewTerm(func=mdp.action_l2_clamped, weight=-0.002)
-
-    # action_rate_l2 = RewTerm(func=mdp.action_rate_l2_clamped, weight=-0.002)
-
 
 @configclass
 class UR10TessoloEventCfg(dexsuite.EventCfg):
@@ -146,7 +105,6 @@ class UR10TessoloMixinCfg:
         self.thumb_contact_name = ("rl_dg_1_tip", "rl_dg_5_tip")
         self.tip_contact_names = ("rl_dg_2_tip", "rl_dg_3_tip", "rl_dg_4_tip")
 
-        # finger_tip_body_list = ["rl_dg_1_tip", "rl_dg_2_tip", "rl_dg_3_tip", "rl_dg_4_tip", "rl_dg_5_tip"]
         finger_tip_body_list = ["rl_dg_1_tip", "rl_dg_2_tip", "rl_dg_3_tip", "rl_dg_4_tip", "rl_dg_5_tip"]
         for link_name in finger_tip_body_list:
             setattr(
@@ -197,6 +155,8 @@ class UR10TessoloMixinCfg:
 
         self.rewards.table_contact_penalty.params["thumb_asset_cfg"] = list(self.thumb_contact_name)
         self.rewards.table_contact_penalty.params["tip_asset_cfg"] = list(self.tip_contact_names)
+
+        self.rewards.any_finger_contact.params["contact_names"] = list(self.thumb_contact_name) + list(self.tip_contact_names)
 
 @configclass
 class DexsuiteUR10TessoloReorientEnvCfg(UR10TessoloMixinCfg, dexsuite.DexsuiteReorientEnvCfg):

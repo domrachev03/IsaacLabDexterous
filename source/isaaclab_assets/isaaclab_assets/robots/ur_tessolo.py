@@ -20,7 +20,7 @@ from isaaclab_assets import ISAACLAB_ASSETS_DATA_DIR
 
 UR10_TESSOLO_DELTO_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
-        usd_path=f"{ISAACLAB_ASSETS_DATA_DIR}/robots/URTessoloAlik/ur10e_delto_optimized_separate_tips_limited_jnts.usd",
+        usd_path=f"{ISAACLAB_ASSETS_DATA_DIR}/robots/URTessoloAlik/ur10e_delto_optimized_separate_tips_limited_jnts_self_collision.usd",
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=True,
             retain_accelerations=True,

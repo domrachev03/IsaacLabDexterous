@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import random
 import re
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import carb
@@ -74,6 +75,42 @@ def spawn_multi_asset(
 
     # spawn everything first in a "Dataset" prim
     proto_prim_paths = list()
+    asset_labels = []
+
+    def _make_asset_label(asset_cfg):
+        """Create a descriptive label for the spawned asset."""
+        # allow configs to pass an explicit label
+        label = getattr(asset_cfg, "spawn_asset_label", None)
+        if label is None:
+            label = getattr(asset_cfg, "_spawn_asset_label", None)
+
+        if label is None and hasattr(asset_cfg, "usd_path") and getattr(asset_cfg, "usd_path") is not None:
+            usd_path = getattr(asset_cfg, "usd_path")
+            if isinstance(usd_path, (list, tuple)):
+                usd_path = usd_path[0]
+            try:
+                label = Path(str(usd_path)).stem
+            except Exception:
+                label = str(usd_path)
+
+        if label is None:
+            label = asset_cfg.__class__.__name__.removesuffix("Cfg")
+            if hasattr(asset_cfg, "size") and getattr(asset_cfg, "size") is not None:
+                size = getattr(asset_cfg, "size")
+                if isinstance(size, (tuple, list)):
+                    size_str = "x".join(f"{dim:g}" for dim in size)
+                    label += f"_{size_str}"
+            else:
+                attributes = []
+                if hasattr(asset_cfg, "radius") and getattr(asset_cfg, "radius") is not None:
+                    attributes.append(f"r_{getattr(asset_cfg, 'radius'):g}")
+                if hasattr(asset_cfg, "height") and getattr(asset_cfg, "height") is not None:
+                    attributes.append(f"h_{getattr(asset_cfg, 'height'):g}")
+                if attributes:
+                    label += "_" + "_".join(attributes)
+
+        return label
+
     for index, asset_cfg in enumerate(cfg.assets_cfg):
         # append semantic tags if specified
         if cfg.semantic_tags is not None:
@@ -99,9 +136,12 @@ def spawn_multi_asset(
         )
         # append to proto prim paths
         proto_prim_paths.append(proto_prim_path)
+        asset_labels.append(_make_asset_label(asset_cfg))
 
     # resolve prim paths for spawning and cloning
     prim_paths = [f"{source_prim_path}/{asset_path}" for source_prim_path in source_prim_paths]
+
+    chosen_asset_indices: list[int] = []
 
     # manually clone prims if the source prim path is a regex expression
     # note: unlike in the cloner API from Isaac Sim, we do not "reset" xforms on the copied prims.
@@ -112,9 +152,11 @@ def spawn_multi_asset(
             env_spec = Sdf.CreatePrimInLayer(stage.GetRootLayer(), prim_path)
             # randomly select an asset configuration
             if cfg.random_choice:
-                proto_path = random.choice(proto_prim_paths)
+                choice_index = random.randrange(len(proto_prim_paths))
             else:
-                proto_path = proto_prim_paths[index % len(proto_prim_paths)]
+                choice_index = index % len(proto_prim_paths)
+            proto_path = proto_prim_paths[choice_index]
+            chosen_asset_indices.append(choice_index)
             # copy the proto prim
             Sdf.CopySpec(env_spec.layer, Sdf.Path(proto_path), env_spec.layer, Sdf.Path(prim_path))
 
@@ -126,6 +168,16 @@ def spawn_multi_asset(
     # the flag is mainly used to inform the user that they should disable `InteractiveScene.replicate_physics`
     carb_settings_iface = carb.settings.get_settings()
     carb_settings_iface.set_bool("/isaaclab/spawn/multi_assets", True)
+
+    # annotate spawned prims with the selected asset metadata for downstream tooling/logging
+    for prim_path, asset_index in zip(prim_paths, chosen_asset_indices):
+        prim = prim_utils.get_prim_at_path(prim_path)
+        if prim is None:
+            continue
+        index_attr = prim.CreateAttribute("isaaclab:spawn:asset_index", Sdf.ValueTypeNames.Int, custom=True)
+        index_attr.Set(asset_index)
+        label_attr = prim.CreateAttribute("isaaclab:spawn:asset_label", Sdf.ValueTypeNames.String, custom=True)
+        label_attr.Set(asset_labels[asset_index])
 
     # return the prim
     return prim_utils.get_prim_at_path(prim_paths[0])
@@ -177,6 +229,11 @@ def spawn_multi_usd_file(
     multi_asset_cfg = MultiAssetSpawnerCfg(assets_cfg=[])
     for usd_path in usd_paths:
         usd_cfg = usd_template_cfg.replace(usd_path=usd_path)
+        try:
+            spawn_label = Path(str(usd_path)).stem
+        except Exception:
+            spawn_label = str(usd_path)
+        setattr(usd_cfg, "spawn_asset_label", spawn_label)
         multi_asset_cfg.assets_cfg.append(usd_cfg)
     # set random choice
     multi_asset_cfg.random_choice = cfg.random_choice

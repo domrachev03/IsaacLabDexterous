@@ -403,7 +403,7 @@ class DexsuiteReorientEnvCfg(ManagerBasedEnvCfg):
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()
     commands: CommandsCfg = CommandsCfg()
-    recorders: mdp.DexsuiteRecorderManagerCfg = mdp.DexsuiteRecorderManagerCfg()
+    # recorders: mdp.DexsuiteRecorderManagerCfg = mdp.DexsuiteRecorderManagerCfg()
     # MDP settings
     rewards: RewardsCfg = RewardsCfg()
     terminations: TerminationsCfg = TerminationsCfg()

@@ -81,8 +81,8 @@ PANDA_ROHAND_CFG = ArticulationCfg(
                 "(th|if|mf|rf|lf)_slider_link": 60.0,
             },
             velocity_limit_sim={
-                "th_root_link": 1000.0,
-                "(th|if|mf|rf|lf)_slider_link": 1000.0,
+                "th_root_link": 100000.0,
+                "(th|if|mf|rf|lf)_slider_link": 100000.0,
             },
             
         #     friction={

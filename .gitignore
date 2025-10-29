@@ -75,4 +75,4 @@ tests/
 !source/isaaclab_assets/data/robots/URTessoloAlik/ur10e_delto_optimized_separate_tips_limited_jnts.usd
 !source/isaaclab_assets/data/robots/URTessoloAlik/ur10e_delto_optimized_separate_tips_limited_jnts_self_collision.usd
 !source/isaaclab_assets/data/robots/panda_rohand.usd
-!source/isaaclab_assets/data/robots/panda_rohand_.usd
+!source/isaaclab_assets/data/robots/panda_rohand_fingertips.usd

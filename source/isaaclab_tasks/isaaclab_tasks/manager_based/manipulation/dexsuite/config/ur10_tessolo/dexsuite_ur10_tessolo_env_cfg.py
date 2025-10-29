@@ -67,7 +67,6 @@ class UR10TessoloReorientRewardCfg(dexsuite.RewardsCfg):
         params={
             "std": 0.2,
             "threshold": 0.2,
-            "thumb_contact_name": "rl_dg_1_tip",
         },
     )
 

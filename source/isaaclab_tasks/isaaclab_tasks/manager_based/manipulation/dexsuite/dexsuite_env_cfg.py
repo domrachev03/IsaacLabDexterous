@@ -340,6 +340,8 @@ class RewardsCfg:
             "std": 0.2,
             "command_name": "object_pose",
             "align_asset_cfg": SceneEntityCfg("object"),
+            "thumb_contact_name": "thumb_finger_tip",
+            "tip_contact_names": ("index_finger_tip", "middle_finger_tip", "ring_finger_tip"),
         },
     )
 
@@ -351,6 +353,8 @@ class RewardsCfg:
             "std": 1.5,
             "command_name": "object_pose",
             "align_asset_cfg": SceneEntityCfg("object"),
+            "thumb_contact_name": "thumb_finger_tip",
+            "tip_contact_names": ("index_finger_tip", "middle_finger_tip", "ring_finger_tip"),
         },
     )
 
@@ -363,6 +367,8 @@ class RewardsCfg:
             "rot_std": 0.5,
             "command_name": "object_pose",
             "align_asset_cfg": SceneEntityCfg("object"),
+            "thumb_contact_name": "thumb_finger_tip",
+            "tip_contact_names": ("index_finger_tip", "middle_finger_tip", "ring_finger_tip"),
         },
     )
 
@@ -431,7 +437,6 @@ class DexsuiteReorientEnvCfg(ManagerBasedEnvCfg):
         if self.curriculum is not None:
             self.curriculum.adr.params["pos_tol"] = self.rewards.success.params["pos_std"] / 2
             self.curriculum.adr.params["rot_tol"] = self.rewards.success.params["rot_std"] / 2
-
 
 class DexsuiteLiftEnvCfg(DexsuiteReorientEnvCfg):
     """Dexsuite lift task definition"""

@@ -103,3 +103,25 @@ class DexsuiteKukaAllegroLiftEnvCfg(KukaAllegroMixinCfg, dexsuite.DexsuiteLiftEn
 @configclass
 class DexsuiteKukaAllegroLiftEnvCfg_PLAY(KukaAllegroMixinCfg, dexsuite.DexsuiteLiftEnvCfg_PLAY):
     pass
+
+
+@configclass
+class DexsuiteKukaAllegroReorientVisibleEnvCfg(KukaAllegroMixinCfg, dexsuite.DexsuiteReorientVisibleEnvCfg):
+    pass
+
+
+@configclass
+class DexsuiteKukaAllegroReorientVisibleEnvCfg_PLAY(
+    KukaAllegroMixinCfg, dexsuite.DexsuiteReorientVisibleEnvCfg_PLAY
+):
+    pass
+
+
+@configclass
+class DexsuiteKukaAllegroLiftVisibleEnvCfg(KukaAllegroMixinCfg, dexsuite.DexsuiteLiftVisibleEnvCfg):
+    pass
+
+
+@configclass
+class DexsuiteKukaAllegroLiftVisibleEnvCfg_PLAY(KukaAllegroMixinCfg, dexsuite.DexsuiteLiftVisibleEnvCfg_PLAY):
+    pass

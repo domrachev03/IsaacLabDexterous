@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 """
-Dextra Kuka Allegro environments.
+Dexsuite UR10 Tessolo environments.
 """
 
 import gymnasium as gym
@@ -59,5 +59,50 @@ gym.register(
         "env_cfg_entry_point": f"{__name__}.dexsuite_ur10_tessolo_env_cfg:DexsuiteUR10TessoloLiftEnvCfg_PLAY",
         "rl_games_cfg_entry_point": f"{agents.__name__}:rl_games_ppo_cfg.yaml",
         "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:DexsuiteUR10TessoloPPORunnerCfg",
+    },
+)
+
+# Visible point-cloud observation variants
+gym.register(
+    id="Isaac-Dexsuite-UR10-Tessolo-Reorient-Visible-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.dexsuite_ur10_tessolo_visible_env_cfg:DexsuiteUR10TessoloReorientVisibleEnvCfg",
+        "rl_games_cfg_entry_point": f"{agents.__name__}:rl_games_ppo_visible_cfg.yaml",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:DexsuiteUR10TessoloVisiblePPORunnerCfg",
+    },
+)
+
+gym.register(
+    id="Isaac-Dexsuite-UR10-Tessolo-Reorient-Visible-Play-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.dexsuite_ur10_tessolo_visible_env_cfg:DexsuiteUR10TessoloReorientVisibleEnvCfg_PLAY",
+        "rl_games_cfg_entry_point": f"{agents.__name__}:rl_games_ppo_visible_cfg.yaml",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:DexsuiteUR10TessoloVisiblePPORunnerCfg",
+    },
+)
+
+gym.register(
+    id="Isaac-Dexsuite-UR10-Tessolo-Visible-Lift-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.dexsuite_ur10_tessolo_visible_env_cfg:DexsuiteUR10TessoloVisibleLiftEnvCfg",
+        "rl_games_cfg_entry_point": f"{agents.__name__}:rl_games_ppo_visible_cfg.yaml",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:DexsuiteUR10TessoloVisiblePPORunnerCfg",
+    },
+)
+
+gym.register(
+    id="Isaac-Dexsuite-UR10-Tessolo-Visible-Lift-Play-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.dexsuite_ur10_tessolo_visible_env_cfg:DexsuiteUR10TessoloVisibleLiftEnvCfg_PLAY",
+        "rl_games_cfg_entry_point": f"{agents.__name__}:rl_games_ppo_visible_cfg.yaml",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:DexsuiteUR10TessoloVisiblePPORunnerCfg",
     },
 )

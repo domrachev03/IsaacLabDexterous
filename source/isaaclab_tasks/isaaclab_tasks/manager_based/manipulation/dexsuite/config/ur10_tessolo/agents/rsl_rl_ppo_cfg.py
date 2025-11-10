@@ -37,3 +37,11 @@ class DexsuiteUR10TessoloPPORunnerCfg(RslRlOnPolicyRunnerCfg):
         desired_kl=0.01,
         max_grad_norm=1.0,
     )
+
+
+@configclass
+class DexsuiteUR10TessoloVisiblePPORunnerCfg(DexsuiteUR10TessoloPPORunnerCfg):
+    obs_groups = {
+        "policy": ["policy", "proprio", "perception"],
+        "critic": ["policy", "proprio", "perception", "critic_privileged"],
+    }

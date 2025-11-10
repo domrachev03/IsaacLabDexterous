@@ -15,6 +15,7 @@ from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.scene import InteractiveSceneCfg
+from isaaclab.sensors import CameraCfg
 from isaaclab.sim import CapsuleCfg, ConeCfg, CuboidCfg, RigidBodyMaterialCfg, SphereCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
@@ -60,6 +61,7 @@ class SceneCfg(InteractiveSceneCfg):
             ),
             collision_props=sim_utils.CollisionPropertiesCfg(),
             mass_props=sim_utils.MassPropertiesCfg(mass=0.2),
+            semantic_tags=[("class", "dexsuite_object")],
         ),
         init_state=RigidObjectCfg.InitialStateCfg(pos=(-0.55, 0.1, 0.35)),
     )
@@ -91,6 +93,22 @@ class SceneCfg(InteractiveSceneCfg):
         spawn=sim_utils.DomeLightCfg(
             intensity=750.0,
             texture_file=f"{ISAAC_NUCLEUS_DIR}/Materials/Textures/Skies/PolyHaven/kloofendal_43d_clear_puresky_4k.hdr",
+        ),
+    )
+
+    # fixed RGBD camera that mirrors the viewer pose and looks at the workspace
+    rgbd_camera: CameraCfg = CameraCfg(
+        prim_path="{ENV_REGEX_NS}/RGBDCamera",
+        update_period=0.0,
+        height=240,
+        width=320,
+        data_types=["rgb", "depth", "instance_id_segmentation_fast"],
+        colorize_instance_id_segmentation=False,
+        spawn=sim_utils.PinholeCameraCfg(focal_length=24.0, clipping_range=(0.1, 5.0)),
+        offset=CameraCfg.OffsetCfg(
+            pos=(-2.25, 0.0, 0.75),
+            rot=(0.46579, -0.53202, 0.53202, -0.46579),
+            convention="ros",
         ),
     )
 
@@ -174,10 +192,63 @@ class ObservationsCfg:
             self.flatten_history_dim = True
             self.history_length = 5
 
+    @configclass
+    class CriticPrivilegedCfg(ObsGroup):
+        """Privileged observations for critic."""
+
+        object_pos_b = ObsTerm(func=mdp.object_pos_b)
+        object_quat_b = ObsTerm(func=mdp.object_quat_b)
+        object_shape_point_cloud = ObsTerm(
+            func=mdp.object_point_cloud_b,
+            params={"num_points": 64, "flatten": True, "visualize": False},
+        )
+
+        def __post_init__(self):
+            self.enable_corruption = False
+            self.concatenate_terms = True
+            self.history_length = 1
+
     # observation groups
     policy: PolicyCfg = PolicyCfg()
     proprio: ProprioObsCfg = ProprioObsCfg()
     perception: PerceptionObsCfg = PerceptionObsCfg()
+    critic_privileged: CriticPrivilegedCfg | None = None
+
+
+@configclass
+class VisibleObservationsCfg(ObservationsCfg):
+    """Observation specification that uses camera-visible point clouds."""
+
+    @configclass
+    class VisiblePolicyCfg(ObsGroup):
+        target_object_pose_b = ObsTerm(func=mdp.generated_commands, params={"command_name": "object_pose"})
+        actions = ObsTerm(func=mdp.last_action)
+
+        def __post_init__(self):
+            self.enable_corruption = True
+            self.concatenate_terms = True
+            self.history_length = 5
+
+    @configclass
+    class VisiblePerceptionObsCfg(ObservationsCfg.PerceptionObsCfg):
+        object_point_cloud = ObsTerm(
+            func=mdp.visible_object_point_cloud_b,
+            noise=Unoise(n_min=-0.0, n_max=0.0),
+            clip=(-2.0, 2.0),
+            params={"num_points": 32, "candidate_points": 128, "flatten": True},
+        )
+
+    policy: VisiblePolicyCfg = VisiblePolicyCfg()
+    perception: VisiblePerceptionObsCfg = VisiblePerceptionObsCfg()
+    critic_privileged: ObservationsCfg.CriticPrivilegedCfg = ObservationsCfg.CriticPrivilegedCfg()
+
+
+@configclass
+class VisibleCurriculumCfg(CurriculumCfg):
+    """Curriculum without object-quaternion noise terms (not observed by policy)."""
+
+    object_quat_unoise_min_adr = None
+    object_quat_unoise_max_adr = None
 
 
 @configclass
@@ -469,3 +540,27 @@ class DexsuiteLiftEnvCfg_PLAY(DexsuiteLiftEnvCfg):
         self.commands.object_pose.debug_vis = True
         self.commands.object_pose.position_only = True
         self.curriculum.adr.params["init_difficulty"] = self.curriculum.adr.params["max_difficulty"]
+
+
+@configclass
+class DexsuiteReorientVisibleEnvCfg(DexsuiteReorientEnvCfg):
+    observations: VisibleObservationsCfg = VisibleObservationsCfg()
+    curriculum: VisibleCurriculumCfg | None = VisibleCurriculumCfg()
+
+
+@configclass
+class DexsuiteLiftVisibleEnvCfg(DexsuiteLiftEnvCfg):
+    observations: VisibleObservationsCfg = VisibleObservationsCfg()
+    curriculum: VisibleCurriculumCfg | None = VisibleCurriculumCfg()
+
+
+@configclass
+class DexsuiteReorientVisibleEnvCfg_PLAY(DexsuiteReorientEnvCfg_PLAY):
+    observations: VisibleObservationsCfg = VisibleObservationsCfg()
+    curriculum: VisibleCurriculumCfg | None = VisibleCurriculumCfg()
+
+
+@configclass
+class DexsuiteLiftVisibleEnvCfg_PLAY(DexsuiteLiftEnvCfg_PLAY):
+    observations: VisibleObservationsCfg = VisibleObservationsCfg()
+    curriculum: VisibleCurriculumCfg | None = VisibleCurriculumCfg()

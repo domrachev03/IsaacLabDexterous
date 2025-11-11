@@ -391,7 +391,10 @@ class visible_object_point_cloud_b(ManagerTermBase):
             return
         info = self.camera.data.info
         for idx in missing.tolist():
-            seg_info = info[idx].get(self.segmentation_key)
+            info_entry = self._extract_camera_info_entry(info, idx)
+            if not info_entry:
+                continue
+            seg_info = info_entry.get(self.segmentation_key)
             if seg_info is None:
                 continue
             mapping = seg_info.get("idToLabels", {})
@@ -407,6 +410,17 @@ class visible_object_point_cloud_b(ManagerTermBase):
                         continue
             if matched_id is not None:
                 self._object_instance_ids[idx] = matched_id
+
+    def _extract_camera_info_entry(self, info_container, env_idx: int) -> dict:
+        """Fetch camera info for environment index, handling shared dict or per-env lists."""
+        if isinstance(info_container, (list, tuple)):
+            if 0 <= env_idx < len(info_container):
+                entry = info_container[env_idx]
+                return entry if isinstance(entry, dict) else {}
+            return {}
+        if isinstance(info_container, dict):
+            return info_container
+        return {}
 
     def _resolve_label_string(self, entry) -> str:
         if isinstance(entry, str):

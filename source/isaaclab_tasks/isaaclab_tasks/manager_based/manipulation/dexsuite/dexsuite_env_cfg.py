@@ -99,7 +99,7 @@ class SceneCfg(InteractiveSceneCfg):
     # fixed RGBD camera that mirrors the viewer pose and looks at the workspace
     rgbd_camera: TiledCameraCfg = TiledCameraCfg(
         prim_path="{ENV_REGEX_NS}/RGBDCamera",
-        update_period=4.0,
+        update_period=1 / 24.0,
         height=240,
         width=320,
         data_types=["rgb", "depth", "instance_id_segmentation_fast"],

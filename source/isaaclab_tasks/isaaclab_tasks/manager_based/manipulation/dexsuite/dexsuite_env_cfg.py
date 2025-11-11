@@ -15,7 +15,7 @@ from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.scene import InteractiveSceneCfg
-from isaaclab.sensors import CameraCfg
+from isaaclab.sensors import CameraCfg, TiledCameraCfg
 from isaaclab.sim import CapsuleCfg, ConeCfg, CuboidCfg, RigidBodyMaterialCfg, SphereCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
@@ -97,7 +97,7 @@ class SceneCfg(InteractiveSceneCfg):
     )
 
     # fixed RGBD camera that mirrors the viewer pose and looks at the workspace
-    rgbd_camera: CameraCfg = CameraCfg(
+    rgbd_camera: TiledCameraCfg = TiledCameraCfg(
         prim_path="{ENV_REGEX_NS}/RGBDCamera",
         update_period=4.0,
         height=240,
@@ -105,7 +105,7 @@ class SceneCfg(InteractiveSceneCfg):
         data_types=["rgb", "depth", "instance_id_segmentation_fast"],
         colorize_instance_id_segmentation=False,
         spawn=sim_utils.PinholeCameraCfg(focal_length=24.0, clipping_range=(0.1, 5.0)),
-        offset=CameraCfg.OffsetCfg(
+        offset=TiledCameraCfg.OffsetCfg(
             pos=(-2.25, 0.0, 0.75),
             rot=(0.46579, -0.53202, 0.53202, -0.46579),
             convention="ros",

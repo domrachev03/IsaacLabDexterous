@@ -237,6 +237,10 @@ class VisibleObservationsCfg(ObservationsCfg):
             clip=(-2.0, 2.0),
             params={"num_points": 32, "candidate_points": 128, "flatten": True},
         )
+        target_object_pose_b = ObsTerm(
+            func=mdp.generated_commands,
+            params={"command_name": "object_pose"},
+        )
 
     policy: VisiblePolicyCfg = VisiblePolicyCfg()
     perception: VisiblePerceptionObsCfg = VisiblePerceptionObsCfg()

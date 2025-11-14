@@ -16,7 +16,7 @@ from isaaclab_assets import ISAACLAB_ASSETS_DATA_DIR
 
 PANDA_ROHAND_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
-        usd_path=f"{ISAACLAB_ASSETS_DATA_DIR}/robots/panda_rohand_fingertips.usd",
+        usd_path=f"{ISAACLAB_ASSETS_DATA_DIR}/robots/panda_rohand_fingertips_fixed.usd",
         activate_contact_sensors=True,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=True,

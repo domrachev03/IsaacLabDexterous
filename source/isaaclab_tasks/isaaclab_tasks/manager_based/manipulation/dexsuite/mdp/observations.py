@@ -237,8 +237,10 @@ class visible_object_point_cloud_b(ManagerTermBase):
         self._env_id_matrix = torch.arange(env.num_envs, device=self._device).unsqueeze(1).repeat(1, self.num_candidates)
         self._fallback_indices = torch.arange(self.num_candidates, device=self._device)
         self._selected_indices = torch.full((env.num_envs, self.num_points), -1, dtype=torch.int64, device=self._device)
-        self._height = self.camera.data.image_shape[0]
-        self._width = self.camera.data.image_shape[1]
+        # self._height = self.camera.data.image_shape[0]
+        # self._width = self.camera.data.image_shape[1]
+        self._height = getattr(self.camera.cfg, "height", 1)
+        self._width = getattr(self.camera.cfg, "width", 1)
 
     def __call__(
         self,

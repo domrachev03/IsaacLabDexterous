@@ -176,3 +176,24 @@ class DexsuiteUR10TessoloLiftEnvCfg(UR10TessoloMixinCfg, dexsuite.DexsuiteLiftEn
 @configclass
 class DexsuiteUR10TessoloLiftEnvCfg_PLAY(UR10TessoloMixinCfg, dexsuite.DexsuiteLiftEnvCfg_PLAY):
     pass
+
+@configclass
+class DexsuiteUR10TessoloReorientVisibleEnvCfg(UR10TessoloMixinCfg, dexsuite.DexsuiteReorientVisibleEnvCfg):
+    pass
+
+
+@configclass
+class DexsuiteUR10TessoloReorientVisibleEnvCfg_PLAY(
+    UR10TessoloMixinCfg, dexsuite.DexsuiteReorientVisibleEnvCfg_PLAY
+):
+    pass
+
+
+@configclass
+class DexsuiteUR10TessoloLiftVisibleEnvCfg(UR10TessoloMixinCfg, dexsuite.DexsuiteLiftVisibleEnvCfg):
+    pass
+
+
+@configclass
+class DexsuiteUR10TessoloLiftVisibleEnvCfg_PLAY(UR10TessoloMixinCfg, dexsuite.DexsuiteLiftVisibleEnvCfg_PLAY):
+    pass

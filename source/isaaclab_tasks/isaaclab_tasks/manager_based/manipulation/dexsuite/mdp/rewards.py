@@ -63,7 +63,6 @@ def any_contact(
 
     contact_mags = [torch.norm(contact, dim=-1) for contact in tip_contact]
     good_contact_cond1 = torch.stack([mag > threshold for mag in contact_mags], dim=-1).any(dim=-1)
-    print(f"Any contact: {good_contact_cond1} / {env.num_envs}")
     return good_contact_cond1
 
 
@@ -88,8 +87,6 @@ def contacts(
     good_contact_cond1 = torch.stack([mag > threshold for mag in thumb_contact_mag], dim=-1).any(dim=-1) & (
         torch.stack([mag > threshold for mag in contact_mags], dim=-1).any(dim=-1)
     )
-
-    print(f"Contacts: {good_contact_cond1} / {env.num_envs}")
 
     return good_contact_cond1
 

@@ -69,16 +69,16 @@ PANDA_ROHAND_CFG = ArticulationCfg(
                 "(th|if|mf|rf|lf)_slider_link",
             ],
             effort_limit_sim={
-                "th_root_link": 40.0,
-                "(th|if|mf|rf|lf)_slider_link": 40.0,
+                "th_root_link": 1000.0,
+                "(th|if|mf|rf|lf)_slider_link": 1000.0,
             },
             stiffness={
-                "th_root_link": 0.06814,
-                "(th|if|mf|rf|lf)_slider_link": 600.0,
+                "th_root_link": 600.0,
+                "(th|if|mf|rf|lf)_slider_link": 900.0,
             },
             damping={
-                "th_root_link": 0.00003,
-                "(th|if|mf|rf|lf)_slider_link": 40.0,
+                "th_root_link": 40.0,
+                "(th|if|mf|rf|lf)_slider_link": 100.0,
             },
             velocity_limit_sim={
                 "th_root_link": 100000.0,

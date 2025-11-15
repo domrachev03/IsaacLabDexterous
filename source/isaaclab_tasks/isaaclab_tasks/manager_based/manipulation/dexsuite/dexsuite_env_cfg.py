@@ -99,7 +99,7 @@ class SceneCfg(InteractiveSceneCfg):
     # fixed RGBD camera that mirrors the viewer pose and looks at the workspace
     rgbd_camera: TiledCameraCfg = TiledCameraCfg(
         prim_path="{ENV_REGEX_NS}/RGBDCamera",
-        update_period=1 / 24.0,
+        update_period=0,
         height=240,
         width=320,
         data_types=["rgb", "depth", "instance_id_segmentation_fast"],
@@ -206,7 +206,7 @@ class ObservationsCfg:
         def __post_init__(self):
             self.enable_corruption = False
             self.concatenate_terms = True
-            self.history_length = 1
+            self.history_length = 5
 
     # observation groups
     policy: PolicyCfg = PolicyCfg()
@@ -237,10 +237,13 @@ class VisibleObservationsCfg(ObservationsCfg):
             clip=(-2.0, 2.0),
             params={"num_points": 32, "candidate_points": 128, "flatten": True},
         )
-        target_object_pose_b = ObsTerm(
-            func=mdp.generated_commands,
-            params={"command_name": "object_pose"},
-        )
+        
+        def __post_init__(self):
+            self.enable_corruption = True
+            self.concatenate_dim = 0
+            self.concatenate_terms = True
+            self.flatten_history_dim = True
+            self.history_length = 5
 
     policy: VisiblePolicyCfg = VisiblePolicyCfg()
     perception: VisiblePerceptionObsCfg = VisiblePerceptionObsCfg()
@@ -447,7 +450,7 @@ class RewardsCfg:
         },
     )
 
-    early_termination = RewTerm(func=mdp.is_terminated_term, weight=-1, params={"term_keys": "abnormal_robot"})
+    # early_termination = RewTerm(func=mdp.is_terminated_term, weight=-1, params={"term_keys": "abnormal_robot"})
 
 
 @configclass
@@ -464,7 +467,7 @@ class TerminationsCfg:
         },
     )
 
-    abnormal_robot = DoneTerm(func=mdp.abnormal_robot_state)
+    # abnormal_robot = DoneTerm(func=mdp.abnormal_robot_state)
 
 
 @configclass

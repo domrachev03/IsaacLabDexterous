@@ -61,7 +61,6 @@ class SceneCfg(InteractiveSceneCfg):
             ),
             collision_props=sim_utils.CollisionPropertiesCfg(),
             mass_props=sim_utils.MassPropertiesCfg(mass=0.2),
-            semantic_tags=[("class", "dexsuite_object")],
         ),
         init_state=RigidObjectCfg.InitialStateCfg(pos=(-0.55, 0.1, 0.35)),
     )
@@ -95,7 +94,7 @@ class SceneCfg(InteractiveSceneCfg):
             texture_file=f"{ISAAC_NUCLEUS_DIR}/Materials/Textures/Skies/PolyHaven/kloofendal_43d_clear_puresky_4k.hdr",
         ),
     )
-
+    # TODO: do not spawn it in state-based envs
     # fixed RGBD camera that mirrors the viewer pose and looks at the workspace
     rgbd_camera: TiledCameraCfg = TiledCameraCfg(
         prim_path="{ENV_REGEX_NS}/RGBDCamera",
@@ -175,44 +174,10 @@ class ObservationsCfg:
             self.concatenate_terms = True
             self.history_length = 5
 
-    @configclass
-    class PerceptionObsCfg(ObsGroup):
-
-        object_point_cloud = ObsTerm(
-            func=mdp.object_point_cloud_b,
-            noise=Unoise(n_min=-0.0, n_max=0.0),
-            clip=(-2.0, 2.0),  # clamp between -2 m to 2 m
-            params={"num_points": 64, "flatten": True},
-        )
-
-        def __post_init__(self):
-            self.enable_corruption = True
-            self.concatenate_dim = 0
-            self.concatenate_terms = True
-            self.flatten_history_dim = True
-            self.history_length = 5
-
-    @configclass
-    class CriticPrivilegedCfg(ObsGroup):
-        """Privileged observations for critic."""
-
-        object_pos_b = ObsTerm(func=mdp.object_pos_b)
-        object_quat_b = ObsTerm(func=mdp.object_quat_b)
-        object_shape_point_cloud = ObsTerm(
-            func=mdp.object_point_cloud_b,
-            params={"num_points": 64, "flatten": True, "visualize": False},
-        )
-
-        def __post_init__(self):
-            self.enable_corruption = False
-            self.concatenate_terms = True
-            self.history_length = 5
-
     # observation groups
     policy: PolicyCfg = PolicyCfg()
     proprio: ProprioObsCfg = ProprioObsCfg()
     perception: PerceptionObsCfg = PerceptionObsCfg()
-    critic_privileged: CriticPrivilegedCfg | None = None
 
 
 @configclass
@@ -243,6 +208,23 @@ class VisibleObservationsCfg(ObservationsCfg):
             self.concatenate_terms = True
             self.flatten_history_dim = True
             self.history_length = 5
+
+    @configclass
+    class CriticPrivilegedCfg(ObsGroup):
+        """Privileged observations for critic."""
+
+        object_pos_b = ObsTerm(func=mdp.object_pos_b)
+        object_quat_b = ObsTerm(func=mdp.object_quat_b)
+        object_shape_point_cloud = ObsTerm(
+            func=mdp.object_point_cloud_b,
+            params={"num_points": 64, "flatten": True, "visualize": False},
+        )
+
+        def __post_init__(self):
+            self.enable_corruption = False
+            self.concatenate_terms = True
+            self.history_length = 5
+
 
     policy: VisiblePolicyCfg = VisiblePolicyCfg()
     perception: VisiblePerceptionObsCfg = VisiblePerceptionObsCfg()

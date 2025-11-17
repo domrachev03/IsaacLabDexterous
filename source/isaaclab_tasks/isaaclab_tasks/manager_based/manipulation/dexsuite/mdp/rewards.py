@@ -140,6 +140,7 @@ def position_command_error_tanh(
     des_pos_b = command[:, :3]
     des_pos_w, _ = combine_frame_transforms(asset.data.root_pos_w, asset.data.root_quat_w, des_pos_b)
     distance = torch.norm(object.data.root_pos_w - des_pos_w, dim=1)
+    print(f"Desired Position: {des_pos_w}, Current Position: {object.data.root_pos_w}, Distance: {distance}")
     return (1 - torch.tanh(distance / std)) * contacts(env, 1.0, thumb_contact_name, tip_contact_names).float()
 
 

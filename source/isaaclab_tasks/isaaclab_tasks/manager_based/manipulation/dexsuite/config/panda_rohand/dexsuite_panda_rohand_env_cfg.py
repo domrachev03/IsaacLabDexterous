@@ -82,16 +82,6 @@ class UR10TessoloEventCfg(dexsuite.EventCfg):
             "velocity_range": [0.0, 0.0],
         },
     )
-    # reset_robot_elbow2_joint = EventTerm(
-    #     func=mdp.reset_joints_by_offset,
-    #     mode="reset",
-    #     params={
-    #         "asset_cfg": SceneEntityCfg("robot", joint_names="panda_joint3"),
-    #         "position_range": [0.0, 0.0],
-    #         "velocity_range": [0.0, 0.0],
-    #     },
-    # )
-
     
 @configclass
 class PandaRoHandMixinCfg:

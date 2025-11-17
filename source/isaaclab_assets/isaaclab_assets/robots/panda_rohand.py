@@ -54,13 +54,13 @@ PANDA_ROHAND_CFG = ArticulationCfg(
         "panda_shoulder": ImplicitActuatorCfg(
             joint_names_expr=["panda_joint[1-4]"],
             effort_limit_sim=87.0,
-            stiffness=400,
+            stiffness=1600,
             damping=80,
         ),
         "panda_forearm": ImplicitActuatorCfg(
             joint_names_expr=["panda_joint[5-7]"],
             effort_limit_sim=12.0,
-            stiffness=400,
+            stiffness=1600,
             damping=80,
         ),
         "rohand": ImplicitActuatorCfg(
@@ -74,11 +74,11 @@ PANDA_ROHAND_CFG = ArticulationCfg(
             },
             stiffness={
                 "th_root_link": 600.0,
-                "(th|if|mf|rf|lf)_slider_link": 900.0,
+                "(th|if|mf|rf|lf)_slider_link": 2400.0,
             },
             damping={
                 "th_root_link": 40.0,
-                "(th|if|mf|rf|lf)_slider_link": 100.0,
+                "(th|if|mf|rf|lf)_slider_link": 220.0,
             },
             velocity_limit_sim={
                 "th_root_link": 100000.0,

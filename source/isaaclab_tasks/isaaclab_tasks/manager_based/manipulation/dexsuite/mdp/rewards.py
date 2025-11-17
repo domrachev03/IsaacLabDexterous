@@ -241,3 +241,15 @@ def object_upward_velocity_bonus(
     reward = torch.tanh(vel_z / scale)
     contact_mask = contacts(env, threshold, thumb_contact_name, tip_contact_names).float()
     return reward * contact_mask
+
+
+def palm_contact(
+    env: ManagerBasedRLEnv,
+    threshold: float,
+    palm_contact_name: str = "palm",
+) -> torch.Tensor:
+    """Reward contact between palm and object above a threshold."""
+    palm_contact: ContactSensor = env.scene.sensors[f"{palm_contact_name}_object_s"]
+    contact_force = palm_contact.data.force_matrix_w.view(env.num_envs, 3)
+    contact_mag = torch.norm(contact_force, dim=-1)
+    return (contact_mag > threshold).float()

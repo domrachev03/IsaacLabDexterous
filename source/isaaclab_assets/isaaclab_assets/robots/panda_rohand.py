@@ -42,7 +42,7 @@ PANDA_ROHAND_CFG = ArticulationCfg(
             "panda_joint6": 3.037,
             "panda_joint7": 0.741,
             # RoHand actuated joints (fully open span)
-            "th_root_link": 0.0,
+            "th_root_link": 1.56,
             "th_slider_link": 0.0,
             "if_slider_link": 0.0,
             "mf_slider_link": 0.0,
@@ -74,11 +74,11 @@ PANDA_ROHAND_CFG = ArticulationCfg(
             },
             stiffness={
                 "th_root_link": 600.0,
-                "(th|if|mf|rf|lf)_slider_link": 2400.0,
+                "(th|if|mf|rf|lf)_slider_link": 1200.0,
             },
             damping={
                 "th_root_link": 40.0,
-                "(th|if|mf|rf|lf)_slider_link": 220.0,
+                "(th|if|mf|rf|lf)_slider_link": 120.0,
             },
             velocity_limit_sim={
                 "th_root_link": 100000.0,

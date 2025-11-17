@@ -239,7 +239,6 @@ class VisibleObservationsCfg(ObservationsCfg):
         )
         
         def __post_init__(self):
-            self.enable_corruption = True
             self.concatenate_dim = 0
             self.concatenate_terms = True
             self.flatten_history_dim = True

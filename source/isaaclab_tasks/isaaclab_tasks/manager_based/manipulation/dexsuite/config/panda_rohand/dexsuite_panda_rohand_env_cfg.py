@@ -30,8 +30,8 @@ class PandaRoHandRelJointPosActionCfg:
             "panda_joint6": 0.1,
             "panda_joint7": 0.1,
             "th_root_link": 0.1,
-            "th_slider_link": 0.001,
-            "(if|mf|rf|lf)_slider_link": 0.001,
+            "th_slider_link": 0.0005,
+            "(if|mf|rf|lf)_slider_link": 0.0005,
         },
     )
 
@@ -40,13 +40,20 @@ class PandaRoHandRelJointPosActionCfg:
 class PandaRoHandReorientRewardCfg(dexsuite.RewardsCfg):
     good_finger_contact = RewTerm(
         func=mdp.contacts,
-        weight=2.0,
+        weight=1.0,
         params={
             "threshold": 0.2,
         },
     )
     any_finger_contact = RewTerm(
         func=mdp.any_contact,
+        weight=1.0,
+        params={
+            "threshold": 0.2,
+        },
+    )
+    palm_contact = RewTerm(
+        func=mdp.palm_contact,
         weight=1.0,
         params={
             "threshold": 0.2,
@@ -66,7 +73,6 @@ class PandaRoHandReorientRewardCfg(dexsuite.RewardsCfg):
         params={
             "std": 0.2,
             "threshold": 0.2,
-            "thumb_contact_name": "th_slider_link",
         },
     )
 
@@ -79,6 +85,15 @@ class UR10TessoloEventCfg(dexsuite.EventCfg):
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=["panda_joint2", "(th|if|mf|rf|lf)_slider_link"]),
             "position_range": [0.0, 0.0],
+            "velocity_range": [0.0, 0.0],
+        },
+    )
+    fix_thumb_root = EventTerm(
+        func=mdp.reset_joints_by_offset,
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("robot", joint_names=["th_root_link"]),
+            "position_range": [1.56, 1.56],
             "velocity_range": [0.0, 0.0],
         },
     )
@@ -99,6 +114,7 @@ class PandaRoHandMixinCfg:
 
         thumb_contact_name = "th_fingertip"
         tip_contact_names = ["if_fingertip", "mf_fingertip", "rf_fingertip", "lf_fingertip"]
+        palm_contact_name = "base_link"
 
         finger_body_names = tip_contact_names + [thumb_contact_name]
         for link_name in finger_body_names:
@@ -111,20 +127,32 @@ class PandaRoHandMixinCfg:
                 ),
             )
 
+        # Add palm contact sensor
+        setattr(
+            self.scene,
+            f"{palm_contact_name}_object_s",
+            ContactSensorCfg(
+                prim_path="{ENV_REGEX_NS}/Robot/franka/rohand_left_flattened/" + palm_contact_name,
+                filter_prim_paths_expr=["{ENV_REGEX_NS}/Object"],
+            ),
+        )
+
         self.scene.table_s = ContactSensorCfg(
             prim_path="{ENV_REGEX_NS}/table",
             filter_prim_paths_expr=["{ENV_REGEX_NS}/Object"],
         )
 
+        # Add palm contact to observations
+        all_contact_bodies = finger_body_names + [palm_contact_name]
         self.observations.proprio.contact = ObsTerm(
             func=mdp.fingers_contact_force_b,
-            params={"contact_sensor_names": [f"{link}_object_s" for link in finger_body_names]},
+            params={"contact_sensor_names": [f"{link}_object_s" for link in all_contact_bodies]},
             clip=(-20.0, 20.0),
         )
-        self.observations.proprio.hand_tips_state_b.params["body_asset_cfg"].body_names = ["base_link"] + finger_body_names
+        self.observations.proprio.hand_tips_state_b.params["body_asset_cfg"].body_names = all_contact_bodies
 
         self.rewards.fingers_to_object.params["asset_cfg"] = SceneEntityCfg(
-            "robot", body_names=["base_link"] + finger_body_names
+            "robot", body_names=all_contact_bodies
         )
         self.events.reset_robot_wrist_joint.params["asset_cfg"] = SceneEntityCfg(
             "robot", joint_names=["panda_joint7"]

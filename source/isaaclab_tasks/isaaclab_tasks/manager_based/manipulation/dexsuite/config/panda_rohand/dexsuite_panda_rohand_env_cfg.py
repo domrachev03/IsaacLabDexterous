@@ -20,7 +20,7 @@ from ... import mdp
 class PandaRoHandRelJointPosActionCfg:
     action = mdp.RelativeJointPositionActionCfg(
         asset_name="robot",
-        joint_names=[".*"],
+        joint_names=["panda_joint(1-7)", "th_root_link"],
         scale={
             "panda_joint1": 0.1,
             "panda_joint2": 0.1,
@@ -30,12 +30,15 @@ class PandaRoHandRelJointPosActionCfg:
             "panda_joint6": 0.1,
             "panda_joint7": 0.1,
             "th_root_link": 0.1,
-            "th_slider_link": 0.0005,
-            "(if|mf|rf|lf)_slider_link": 0.0005,
         },
     )
-
-
+    sliders = mdp.JointPositionActionCfg(
+        asset_name="robot",
+        joint_names=["(th|if|mf|rf|lf)_slider_link"],
+        scale=0.0005,
+        use_default_offset=True,
+        preserve_order=True,
+    )
 @configclass
 class PandaRoHandReorientRewardCfg(dexsuite.RewardsCfg):
     good_finger_contact = RewTerm(
@@ -114,7 +117,7 @@ class PandaRoHandMixinCfg:
 
         thumb_contact_name = "th_fingertip"
         tip_contact_names = ["if_fingertip", "mf_fingertip", "rf_fingertip", "lf_fingertip"]
-        palm_contact_name = "base_link"
+        palm_contact_name = "palm_ft"
 
         finger_body_names = tip_contact_names + [thumb_contact_name]
         for link_name in finger_body_names:
@@ -178,6 +181,7 @@ class PandaRoHandMixinCfg:
         self.rewards.table_contact_penalty.params["tip_asset_cfg"] = tip_contact_names
 
         self.rewards.any_finger_contact.params["contact_names"] = finger_body_names
+        self.rewards.palm_contact.params["palm_contact_name"] = palm_contact_name
 
 
 @configclass

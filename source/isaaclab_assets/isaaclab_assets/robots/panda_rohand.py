@@ -16,7 +16,7 @@ from isaaclab_assets import ISAACLAB_ASSETS_DATA_DIR
 
 PANDA_ROHAND_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
-        usd_path=f"{ISAACLAB_ASSETS_DATA_DIR}/robots/panda_rohand_fingertips_fixed.usd",
+        usd_path=f"{ISAACLAB_ASSETS_DATA_DIR}/robots/panda_rohand_fingertips_fixed_palm_ft.usd",
         activate_contact_sensors=True,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=True,
@@ -74,11 +74,11 @@ PANDA_ROHAND_CFG = ArticulationCfg(
             },
             stiffness={
                 "th_root_link": 600.0,
-                "(th|if|mf|rf|lf)_slider_link": 1200.0,
+                "(th|if|mf|rf|lf)_slider_link": 600.0,
             },
             damping={
                 "th_root_link": 40.0,
-                "(th|if|mf|rf|lf)_slider_link": 120.0,
+                "(th|if|mf|rf|lf)_slider_link": 40.0,
             },
             velocity_limit_sim={
                 "th_root_link": 100000.0,

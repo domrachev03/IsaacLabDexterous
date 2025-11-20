@@ -20,7 +20,7 @@ from ... import mdp
 class PandaRoHandRelJointPosActionCfg:
     action = mdp.RelativeJointPositionActionCfg(
         asset_name="robot",
-        joint_names=["panda_joint(1-7)", "th_root_link"],
+        joint_names=["panda_joint[1-7]", "th_root_link"],
         scale={
             "panda_joint1": 0.1,
             "panda_joint2": 0.1,

@@ -188,7 +188,7 @@ class EventCfg:
     randomize_object_scale = EventTerm(
         func=mdp.randomize_rigid_body_scale,
         mode="prestartup",
-        params={"scale_range": (0.5, 1.0), "asset_cfg": SceneEntityCfg("object")},
+        params={"scale_range": (0.75, 1.5), "asset_cfg": SceneEntityCfg("object")},
     )
 
     robot_physics_material = EventTerm(
@@ -208,33 +208,33 @@ class EventCfg:
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("object", body_names=".*"),
-            "static_friction_range": [1.0, 1.0],
-            "dynamic_friction_range": [1.0, 1.0],
+            "static_friction_range": [0.5, 1.0],
+            "dynamic_friction_range": [0.5, 1.0],
             "restitution_range": [0.0, 0.0],
             "num_buckets": 250,
         },
     )
 
-    # joint_stiffness_and_damping = EventTerm(
-    #     func=mdp.randomize_actuator_gains,
-    #     mode="startup",
-    #     params={
-    #         "asset_cfg": SceneEntityCfg("robot", joint_names=".*"),
-    #         "stiffness_distribution_params": [0.5, 2.0],
-    #         "damping_distribution_params": [0.5, 2.0],
-    #         "operation": "scale",
-    #     },
-    # )
+    joint_stiffness_and_damping = EventTerm(
+        func=mdp.randomize_actuator_gains,
+        mode="startup",
+        params={
+            "asset_cfg": SceneEntityCfg("robot", joint_names=".*"),
+            "stiffness_distribution_params": [0.5, 2.0],
+            "damping_distribution_params": [0.5, 2.0],
+            "operation": "scale",
+        },
+    )
 
-    # joint_friction = EventTerm(
-    #     func=mdp.randomize_joint_parameters,
-    #     mode="startup",
-    #     params={
-    #         "asset_cfg": SceneEntityCfg("robot", joint_names=".*"),
-    #         "friction_distribution_params": [0.0, 5.0],
-    #         "operation": "scale",
-    #     },
-    # )
+    joint_friction = EventTerm(
+        func=mdp.randomize_joint_parameters,
+        mode="startup",
+        params={
+            "asset_cfg": SceneEntityCfg("robot", joint_names=".*"),
+            "friction_distribution_params": [0.0, 5.0],
+            "operation": "scale",
+        },
+    )
 
     object_scale_mass = EventTerm(
         func=mdp.randomize_rigid_body_mass,

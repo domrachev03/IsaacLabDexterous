@@ -16,7 +16,7 @@ from isaaclab_assets import ISAACLAB_ASSETS_DATA_DIR
 
 PANDA_ROHAND_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
-        usd_path=f"{ISAACLAB_ASSETS_DATA_DIR}/robots/panda_rohand_fingertips_fixed_palm_ft.usd",
+        usd_path=f"{ISAACLAB_ASSETS_DATA_DIR}/robots/panda_rohand_simplified_ang_jnt.usd",
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=True,
             retain_accelerations=True,
@@ -53,11 +53,11 @@ PANDA_ROHAND_CFG = ArticulationCfg(
             "panda_joint7": 0.741,
             # RoHand actuated joints (fully open span)
             "th_root_link": 1.56,
-            "th_slider_link": 0.0,
-            "if_slider_link": 0.0,
-            "mf_slider_link": 0.0,
-            "rf_slider_link": 0.0,
-            "lf_slider_link": 0.0,
+            "th_proximal_link": 0.0,
+            "if_proximal_link": 0.0,
+            "mf_proximal_link": 0.0,
+            "rf_proximal_link": 0.0,
+            "lf_proximal_link": 0.0,
         },
     ),
     actuators={
@@ -76,23 +76,38 @@ PANDA_ROHAND_CFG = ArticulationCfg(
         "rohand": ImplicitActuatorCfg(
             joint_names_expr=[
                 "th_root_link",
-                "(th|if|mf|rf|lf)_slider_link",
+                "(th|if|mf|rf|lf)_proximal_link",
             ],
             effort_limit_sim={
                 "th_root_link": 1000.0,
-                "(th|if|mf|rf|lf)_slider_link": 1000.0,
+                "th_proximal_link": 1000.0,
+                "if_proximal_link": 1000.0,
+                "mf_proximal_link": 1000.0,
+                "rf_proximal_link": 1000.0,
             },
             stiffness={
                 "th_root_link": 600.0,
-                "(th|if|mf|rf|lf)_slider_link": 600.0,
+                "th_proximal_link": 0.03983,
+                "if_proximal_link": 0.07769,
+                "mf_proximal_link": 0.08817,
+                "rf_proximal_link": 0.07769,
+                "lf_proximal_link": 0.0563,
             },
             damping={
                 "th_root_link": 40.0,
-                "(th|if|mf|rf|lf)_slider_link": 40.0,
+                "th_proximal_link": 0.00002,
+                "if_proximal_link": 0.00003,
+                "mf_proximal_link": 0.00004,
+                "rf_proximal_link": 0.00003,
+                "lf_proximal_link": 0.00002,
             },
             velocity_limit_sim={
                 "th_root_link": 100000.0,
-                "(th|if|mf|rf|lf)_slider_link": 100000.0,
+                "th_proximal_link": 100000.0,
+                "if_proximal_link": 100000.0,
+                "mf_proximal_link": 100000.0,
+                "rf_proximal_link": 100000.0,
+                "lf_proximal_link": 100000.0,
             },
             
         #     friction={

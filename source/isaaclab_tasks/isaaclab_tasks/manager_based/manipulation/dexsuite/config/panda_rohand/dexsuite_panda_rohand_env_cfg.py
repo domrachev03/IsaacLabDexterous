@@ -29,15 +29,15 @@ class PandaRoHandRelJointPosActionCfg:
             "panda_joint5": 0.1,
             "panda_joint6": 0.1,
             "panda_joint7": 0.1,
-            "th_root_link": 0.2,
-            "(th|if|mf|rf|lf)_proximal_link": 0.1,
+            "th_root_link": 0.02,
+            "(th|if|mf|rf|lf)_proximal_link": 0.02,
         },
     )
 @configclass
 class PandaRoHandReorientRewardCfg(dexsuite.RewardsCfg):
     good_finger_contact = RewTerm(
         func=mdp.contacts,
-        weight=2.0,
+        weight=3.0,
         params={
             "threshold": 0.2,
         },
@@ -128,10 +128,10 @@ class PandaRoHandMixinCfg:
             params={"contact_sensor_names": [f"{link}_object_s" for link in finger_body_names]},
             clip=(-20.0, 20.0),
         )
-        self.observations.proprio.hand_tips_state_b.params["body_asset_cfg"].body_names = all_body_names
+        self.observations.proprio.hand_tips_state_b.params["body_asset_cfg"].body_names = finger_body_names
 
         self.rewards.fingers_to_object.params["asset_cfg"] = SceneEntityCfg(
-            "robot", body_names=all_body_names
+            "robot", body_names=finger_body_names
         )
         self.events.reset_robot_wrist_joint.params["asset_cfg"] = SceneEntityCfg(
             "robot", joint_names=["panda_joint7"]

@@ -96,6 +96,8 @@ class SceneCfg(InteractiveSceneCfg):
         ),
     )
 
+
+class VisibleSceneCfg(SceneCfg):
     # fixed RGBD camera that mirrors the viewer pose and looks at the workspace
     rgbd_camera: TiledCameraCfg = TiledCameraCfg(
         prim_path="{ENV_REGEX_NS}/RGBDCamera",
@@ -551,23 +553,27 @@ class DexsuiteLiftEnvCfg_PLAY(DexsuiteLiftEnvCfg):
 
 @configclass
 class DexsuiteReorientVisibleEnvCfg(DexsuiteReorientEnvCfg):
+    scene: VisibleSceneCfg = VisibleSceneCfg(num_envs=4096, env_spacing=3, replicate_physics=False)
     observations: VisibleObservationsCfg = VisibleObservationsCfg()
     curriculum: VisibleCurriculumCfg | None = VisibleCurriculumCfg()
 
 
 @configclass
 class DexsuiteLiftVisibleEnvCfg(DexsuiteLiftEnvCfg):
+    scene: VisibleSceneCfg = VisibleSceneCfg(num_envs=4096, env_spacing=3, replicate_physics=False)
     observations: VisibleObservationsCfg = VisibleObservationsCfg()
     curriculum: VisibleCurriculumCfg | None = VisibleCurriculumCfg()
 
 
 @configclass
 class DexsuiteReorientVisibleEnvCfg_PLAY(DexsuiteReorientEnvCfg_PLAY):
+    scene: VisibleSceneCfg = VisibleSceneCfg(num_envs=4096, env_spacing=3, replicate_physics=False)
     observations: VisibleObservationsCfg = VisibleObservationsCfg()
     curriculum: VisibleCurriculumCfg | None = VisibleCurriculumCfg()
 
 
 @configclass
 class DexsuiteLiftVisibleEnvCfg_PLAY(DexsuiteLiftEnvCfg_PLAY):
+    scene: VisibleSceneCfg = VisibleSceneCfg(num_envs=4096, env_spacing=3, replicate_physics=False)
     observations: VisibleObservationsCfg = VisibleObservationsCfg()
     curriculum: VisibleCurriculumCfg | None = VisibleCurriculumCfg()

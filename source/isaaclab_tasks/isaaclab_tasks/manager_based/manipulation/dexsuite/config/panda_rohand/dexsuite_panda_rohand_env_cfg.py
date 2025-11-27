@@ -29,8 +29,8 @@ class PandaRoHandRelJointPosActionCfg:
             "panda_joint5": 0.1,
             "panda_joint6": 0.1,
             "panda_joint7": 0.1,
-            "th_root_link": 0.02,
-            "(th|if|mf|rf|lf)_proximal_link": 0.02,
+            "th_root_link": 0.1,
+            "(th|if|mf|rf|lf)_proximal_link": 0.1,
         },
     )
 @configclass
@@ -139,6 +139,7 @@ class PandaRoHandMixinCfg:
 
         self.rewards.position_tracking.params["thumb_contact_name"] = thumb_contact_name
         self.rewards.position_tracking.params["tip_contact_names"] = tip_contact_names
+        self.rewards.position_tracking.params["threshold"] = 0.2
 
         if self.rewards.orientation_tracking:
             self.rewards.orientation_tracking.params["thumb_contact_name"] = thumb_contact_name
@@ -146,6 +147,7 @@ class PandaRoHandMixinCfg:
 
         self.rewards.success.params["thumb_contact_name"] = thumb_contact_name
         self.rewards.success.params["tip_contact_names"] = tip_contact_names
+        self.rewards.success.params["threshold"] = 0.2
 
         self.rewards.good_finger_contact.params["thumb_contact_name"] = thumb_contact_name
         self.rewards.good_finger_contact.params["tip_contact_names"] = tip_contact_names

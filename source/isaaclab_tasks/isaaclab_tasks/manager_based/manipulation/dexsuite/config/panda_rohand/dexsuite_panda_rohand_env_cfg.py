@@ -68,7 +68,37 @@ class PandaRoHandReorientRewardCfg(dexsuite.RewardsCfg):
 
 
 @configclass
-class UR10TessoloEventCfg(dexsuite.EventCfg):
+class PandaRoHandEventCfg(dexsuite.EventCfg):
+    randomize_object_scale = EventTerm(
+        func=mdp.randomize_rigid_body_scale,
+        mode="prestartup",
+        params={"scale_range": (0.75, 1.0), "asset_cfg": SceneEntityCfg("object")}, # Limit scaling 
+    )
+
+    # Setting absolute friction
+    robot_physics_material = EventTerm(
+        func=mdp.randomize_rigid_body_material,
+        mode="startup",
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names=".*"),
+            "static_friction_range": [1.0, 1.0],                        
+            "dynamic_friction_range": [1.0, 1.0],
+            "restitution_range": [0.0, 0.0],
+            "num_buckets": 250,
+        },
+    )
+
+    object_physics_material = EventTerm(
+        func=mdp.randomize_rigid_body_material,
+        mode="startup",
+        params={
+            "asset_cfg": SceneEntityCfg("object", body_names=".*"),
+            "static_friction_range": [1.0, 1.0],
+            "dynamic_friction_range": [1.0, 1.0],
+            "restitution_range": [0.0, 0.0],
+            "num_buckets": 250,
+        },
+    )
     fix_robot_joints = EventTerm(
         func=mdp.reset_joints_by_offset,
         mode="reset",
@@ -92,7 +122,7 @@ class UR10TessoloEventCfg(dexsuite.EventCfg):
 class PandaRoHandMixinCfg:
     rewards: PandaRoHandReorientRewardCfg = PandaRoHandReorientRewardCfg()
     actions: PandaRoHandRelJointPosActionCfg = PandaRoHandRelJointPosActionCfg()
-    events: UR10TessoloEventCfg = UR10TessoloEventCfg()
+    events: PandaRoHandEventCfg = PandaRoHandEventCfg()
 
     def __post_init__(self: dexsuite.DexsuiteReorientEnvCfg):
         super().__post_init__()

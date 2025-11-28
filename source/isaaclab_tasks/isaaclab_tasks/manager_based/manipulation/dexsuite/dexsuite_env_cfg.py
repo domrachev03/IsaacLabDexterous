@@ -188,7 +188,7 @@ class EventCfg:
     randomize_object_scale = EventTerm(
         func=mdp.randomize_rigid_body_scale,
         mode="prestartup",
-        params={"scale_range": (0.75, 1.5), "asset_cfg": SceneEntityCfg("object")},
+        params={"scale_range": (0.75, 1.0), "asset_cfg": SceneEntityCfg("object")},
     )
 
     robot_physics_material = EventTerm(

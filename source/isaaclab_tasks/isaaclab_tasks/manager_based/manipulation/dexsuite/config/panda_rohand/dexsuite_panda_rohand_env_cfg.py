@@ -131,6 +131,7 @@ class PandaRoHandMixinCfg:
 
         # The RoHand palm attaches under panda_link7, so align the command sampling to the table frame.
         self.scene.table.spawn.activate_contact_sensors = True
+        self.commands.object_pose.ranges.pos_x = (0.3, 0.7)
 
         thumb_contact_name = "th_fingertip"
         tip_contact_names = ["if_fingertip", "mf_fingertip", "rf_fingertip", "lf_fingertip"]

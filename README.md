@@ -22,7 +22,7 @@ The dexsuite code is located in `source/isaaclab_tasks/isaaclab_tasks/manager_ba
     - `dexsuite_ur10_tessolo_env_cfg.py`: UR10 + Tessolo mixins (assets, control, observations) layered on top of the base dexsuite reorient/lift env cfgs.
     - `agents/rl_games_ppo_cfg.yaml`: PPO hyperparameters for `rl_games` on UR10 + Tessolo.
   - `kuka_allegro/`: Kuka + Allegro mixins.
-  - `panda_rohand/`: Panda + RoHand mixins (available on `feat/panda_rohand_ang`).
+- `panda_rohand/`: Panda + RoHand mixins (available on `feat/panda_rohand_ang`).
 
 ### Visible-points-only branch (`feat/visible_points_only`)
 - Observation change: uses `mdp.visible_object_point_cloud_b` to sample object surface points once, project them into the RGB-D camera, and keep only points passing depth + instance segmentation checks. Requires cameras to be enabled at runtime.
@@ -32,8 +32,18 @@ The dexsuite code is located in `source/isaaclab_tasks/isaaclab_tasks/manager_ba
   - Zero: `python3 scripts/environments/zero_agent.py --task Isaac-Dexsuite-UR10-Tessolo-Reorient-Visible-v0 --num_envs 1 --enable_cameras`
   - Random: `python3 scripts/environments/random_agent.py --task Isaac-Dexsuite-UR10-Tessolo-Reorient-Visible-v0 --num_envs 1 --enable_cameras`
   - Teleop: `python3 scripts/environments/teleoperation/teleop_se3_agent.py --task Isaac-Dexsuite-UR10-Tessolo-Reorient-Visible-Play-v0 --num_envs 1 --teleop_device keyboard --enable_cameras`
-  - Training: `python3 scripts/reinforcement_learning/rl_games/train.py --task Isaac-Dexsuite-UR10-Tessolo-Reorient-Visible-v0 --num_envs 4096 --headless --enable_cameras`
+  - Training: `python3 scripts/reinforcement_learning/rl_games/train.py --task Isaac-Dexsuite-UR10-Tessolo-Reorient-Visible-v0 --num_envs 4096 --headless --enable_cameras --wandb-project-name UR10TesolloVisionBased --wandb-entity cs672_team --wandb-name UR-Tessolo-Vision --track`
   - Play: `python3 scripts/reinforcement_learning/rl_games/play.py --task Isaac-Dexsuite-UR10-Tessolo-Reorient-Visible-v0 --num_envs 512 --checkpoint <path_to_checkpoint> --enable_cameras`
+
+### W&B logging
+WandB logging allows you to track the progress and compare different runs. Before using, you need to login to your WandB account:
+```bash
+wandb login
+```
+Here is information about the W&B setup used in this project:
+- Entity: `cs672_team`.
+- Projects: [UR10TesolloVisionBased](https://wandb.ai/cs672_team/UR10TesolloVisionBased) (UR10 Tessolo state/vision runs) and [panda_rohand_lift](https://wandb.ai/cs672_team/panda_rohand_lift) (Panda + RoHand runs).
+- Add to runs: `--wandb-entity cs672_team --wandb-project-name <project> --wandb-name <run_name> --track`.
 
 ### Installation Instructions
 Below we provide venv/conda-based installation (works for `main` and for the two feature branches). 
@@ -86,9 +96,18 @@ python3 scripts/environments/teleoperation/teleop_se3_agent.py --task Isaac-Dexs
 Replace the task id with any other dexsuite robot; for visible-point tasks also add `--enable_cameras`.
 
 ### Training
-To train with `rl_games`, run (same command on any branch):
+To train with `rl_games`, include W&B flags:
+- UR10 Tessolo (state-based):
 ```bash
-python3 scripts/reinforcement_learning/rl_games/train.py --task Isaac-Dexsuite-UR10-Tessolo-Lift-v0 --num_envs 4096 --headless
+python3 scripts/reinforcement_learning/rl_games/train.py --task Isaac-Dexsuite-UR10-Tessolo-Lift-v0 --num_envs 4096 --headless --wandb-project-name UR10TesolloVisionBased --wandb-entity cs672_team --wandb-name UR-Tessolo-State --track
+```
+- UR10 Tessolo vision-based (visible-point env on `feat/visible_points_only`, requires cameras):
+```bash
+python3 scripts/reinforcement_learning/rl_games/train.py --task Isaac-Dexsuite-UR10-Tessolo-Lift-Visible-v0 --num_envs 4096 --headless --enable_cameras --wandb-project-name UR10TesolloVisionBased --wandb-entity cs672_team --wandb-name UR-Tessolo-Vision --track
+```
+- Panda + RoHand (lift example on `feat/panda_rohand_ang`):
+```bash
+python3 scripts/reinforcement_learning/rl_games/train.py --task Isaac-Dexsuite-Panda-RoHand-Lift-v0 --num_envs 4096 --headless --wandb-project-name panda_rohand_lift --wandb-entity cs672_team --wandb-name Panda-RoHand-Lift --track
 ```
 
 To run a trained policy, use the corresponding `play.py` script and point `--checkpoint` to the run you trained (logs land in `logs/rl_games/<config_name>/<run_id>/nn/`):

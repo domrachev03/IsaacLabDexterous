@@ -2,111 +2,100 @@
 
 ---
 
-# Isaac Lab
+# Dexsuite for Isaac Lab
 
-[![IsaacSim](https://img.shields.io/badge/IsaacSim-5.0.0-silver.svg)](https://docs.isaacsim.omniverse.nvidia.com/latest/index.html)
-[![Python](https://img.shields.io/badge/python-3.11-blue.svg)](https://docs.python.org/3/whatsnew/3.11.html)
-[![Linux platform](https://img.shields.io/badge/platform-linux--64-orange.svg)](https://releases.ubuntu.com/22.04/)
-[![Windows platform](https://img.shields.io/badge/platform-windows--64-orange.svg)](https://www.microsoft.com/en-us/)
-[![pre-commit](https://img.shields.io/github/actions/workflow/status/isaac-sim/IsaacLab/pre-commit.yaml?logo=pre-commit&logoColor=white&label=pre-commit&color=brightgreen)](https://github.com/isaac-sim/IsaacLab/actions/workflows/pre-commit.yaml)
-[![docs status](https://img.shields.io/github/actions/workflow/status/isaac-sim/IsaacLab/docs.yaml?label=docs&color=brightgreen)](https://github.com/isaac-sim/IsaacLab/actions/workflows/docs.yaml)
-[![License](https://img.shields.io/badge/license-BSD--3-yellow.svg)](https://opensource.org/licenses/BSD-3-Clause)
-[![License](https://img.shields.io/badge/license-Apache--2.0-yellow.svg)](https://opensource.org/license/apache-2-0)
+Dexsuite is a dexterous manipulation suite built on Isaac Lab. A single base dexsuite setup defines common MDPs, rewards,
+observations, and assets, and multiple robot-specific configurations plug into it (UR10 Tessolo, Kuka Allegro, Panda RoHand, and more).
+All robot variants share the same control, logging, and training pipeline while swapping only the robot/hand mixins and task configs.
 
+## Branches
+- `feat/panda_rohand_ang`: adds a challenging setup with a 7-DoF Panda arm and a 6-DoF RoHand; each finger uses a 4-bar linkage and angle-based actuation.
+- `feat/visible_points_only`: keeps the same dexsuite base but exposes variants where perception/inputs can be limited to visible points only.
+Both branches use the same commands below; just `git checkout` the branch you need and select the corresponding task id for that robot setup.
 
-**Isaac Lab** is a GPU-accelerated, open-source framework designed to unify and simplify robotics research workflows,
-such as reinforcement learning, imitation learning, and motion planning. Built on [NVIDIA Isaac Sim](https://docs.isaacsim.omniverse.nvidia.com/latest/index.html),
-it combines fast and accurate physics and sensor simulation, making it an ideal choice for sim-to-real
-transfer in robotics.
+## Base layout (shared across robot setups)
+The dexsuite code is located in `source/isaaclab_tasks/isaaclab_tasks/manager_based/manipulation/dexsuite/` and consists of:
+- `dexsuite_env_cfg.py`: base dexsuite environment definitions (reorient and lift tasks).
+- `mdp/*`: shared MDP pieces (observations, terminations, rewards).
+- `config/`: robot overlays:
+  - `ur10_tessolo/`: UR10 + Tessolo mixins. 
+    - `dexsuite_ur10_tessolo_env_cfg.py`: UR10 + Tessolo mixins (assets, control, observations) layered on top of the base dexsuite reorient/lift env cfgs.
+    - `agents/rl_games_ppo_cfg.yaml`: PPO hyperparameters for `rl_games` on UR10 + Tessolo.
+  - `kuka_allegro/`: Kuka + Allegro mixins.
+  - `panda_rohand/`: Panda + RoHand mixins (available on `feat/panda_rohand_ang`).
 
-Isaac Lab provides developers with a range of essential features for accurate sensor simulation, such as RTX-based
-cameras, LIDAR, or contact sensors. The framework's GPU acceleration enables users to run complex simulations and
-computations faster, which is key for iterative processes like reinforcement learning and data-intensive tasks.
-Moreover, Isaac Lab can run locally or be distributed across the cloud, offering flexibility for large-scale deployments.
+### Visible-points-only branch (`feat/visible_points_only`)
+- Observation change: uses `mdp.visible_object_point_cloud_b` to sample object surface points once, project them into the RGB-D camera, and keep only points passing depth + instance segmentation checks. Requires cameras to be enabled at runtime.
+- Extra task IDs (UR10 + Tessolo): `Isaac-Dexsuite-UR10-Tessolo-Reorient-Visible-v0`, `Isaac-Dexsuite-UR10-Tessolo-Reorient-Visible-Play-v0`, `Isaac-Dexsuite-UR10-Tessolo-Lift-Visible-v0`, `Isaac-Dexsuite-UR10-Tessolo-Lift-Visible-Play-v0` (mirrored for Kuka + Allegro).
+- Agent configs: `config/*/agents/rl_games_ppo_visible_cfg.yaml` (experiment names like `reorient_visible`).
+- Commands (append `--enable_cameras`):
+  - Zero: `python3 scripts/environments/zero_agent.py --task Isaac-Dexsuite-UR10-Tessolo-Reorient-Visible-v0 --num_envs 1 --enable_cameras`
+  - Random: `python3 scripts/environments/random_agent.py --task Isaac-Dexsuite-UR10-Tessolo-Reorient-Visible-v0 --num_envs 1 --enable_cameras`
+  - Teleop: `python3 scripts/environments/teleoperation/teleop_se3_agent.py --task Isaac-Dexsuite-UR10-Tessolo-Reorient-Visible-Play-v0 --num_envs 1 --teleop_device keyboard --enable_cameras`
+  - Training: `python3 scripts/reinforcement_learning/rl_games/train.py --task Isaac-Dexsuite-UR10-Tessolo-Reorient-Visible-v0 --num_envs 4096 --headless --enable_cameras`
+  - Play: `python3 scripts/reinforcement_learning/rl_games/play.py --task Isaac-Dexsuite-UR10-Tessolo-Reorient-Visible-v0 --num_envs 512 --checkpoint <path_to_checkpoint> --enable_cameras`
 
+### Installation Instructions
+Below we provide venv/conda-based installation (works for `main` and for the two feature branches). 
+1. Create any python virtual env (venv, conda env, uv env)
+2. Install PyTorch. Update cuda version in `index-url` if needed:
+```bash
+pip install torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cu128
+```
+3. Install `rl_games`, which we primarily use for RL training:
+```bash
+pip install  git+https://github.com/isaac-sim/rl_games.git@python3.11
+```
+4. Install `isaacsim`, which is the core simulation engine:
+```bash
+pip install "isaacsim[all,extscache]==5.1.0" --extra-index-url https://pypi.nvidia.com
+```
+5. Clone and enter Isaac Lab repository:
+```bash
+git clone https://github.com/domrachev03/IsaacLabDexterous.git
+cd IsaacLabDexterous
+# optional: git checkout feat/panda_rohand_ang    # Panda + RoHand setup
+# optional: git checkout feat/visible_points_only # visible-points-only observations
+```
+6. Install Isaac Lab:
+```bash
+./isaaclab.sh -i
+```
 
-## Key Features
+### Environments
+One base dexsuite environment backs multiple robot setups:
+- UR10 + Tessolo hand (reorient/lift; `Isaac-Dexsuite-UR10-Tessolo-*-v0`) on all branches
+- Kuka + Allegro hand (reorient/lift; `Isaac-Dexsuite-Kuka-Allegro-*-v0`) on all branches
+- Panda + RoHand (reorient/lift; available after `git checkout feat/panda_rohand_ang`) with 7-DoF arm and 4-bar linked fingers.
+- Visible-only perception variants exist on `feat/visible_points_only` (see task IDs above) and require `--enable_cameras`.
 
-Isaac Lab offers a comprehensive set of tools and environments designed to facilitate robot learning:
+### Running Environment
+Use the same scripts on any branch; switch the `--task` to the robot you want:
+1. Zero Agent -- spawns environment with zero actions, e.g.:
+```bash
+python3 scripts/environments/zero_agent.py --task Isaac-Dexsuite-UR10-Tessolo-Lift-v0 --num_envs 1
+```
+2. Random Agent -- spawns environment with random actions, e.g.:
+```bash
+python3 scripts/environments/random_agent.py --task Isaac-Dexsuite-UR10-Tessolo-Lift-v0 --num_envs 1
+```
+3. Teleoperation -- control with keyboard/gamepad on a teleop-friendly variant:
+```bash
+python3 scripts/environments/teleoperation/teleop_se3_agent.py --task Isaac-Dexsuite-UR10-Tessolo-Lift-Play-v0 --num_envs 1 --teleop_device keyboard
+```
+Replace the task id with any other dexsuite robot; for visible-point tasks also add `--enable_cameras`.
 
-- **Robots**: A diverse collection of robots, from manipulators, quadrupeds, to humanoids, with 16 commonly available models.
-- **Environments**: Ready-to-train implementations of more than 30 environments, which can be trained with popular reinforcement learning frameworks such as RSL RL, SKRL, RL Games, or Stable Baselines. We also support multi-agent reinforcement learning.
-- **Physics**: Rigid bodies, articulated systems, deformable objects
-- **Sensors**: RGB/depth/segmentation cameras, camera annotations, IMU, contact sensors, ray casters.
+### Training
+To train with `rl_games`, run (same command on any branch):
+```bash
+python3 scripts/reinforcement_learning/rl_games/train.py --task Isaac-Dexsuite-UR10-Tessolo-Lift-v0 --num_envs 4096 --headless
+```
 
+To run a trained policy, use the corresponding `play.py` script and point `--checkpoint` to the run you trained (logs land in `logs/rl_games/<config_name>/<run_id>/nn/`):
+```bash
+python3 scripts/reinforcement_learning/rl_games/play.py --task Isaac-Dexsuite-UR10-Tessolo-Lift-v0 --num_envs 512 --checkpoint logs/rl_games/lift/<run_id>/nn/<checkpoint>.pth
+```
 
-## Getting Started
-
-### Documentation
-
-Our [documentation page](https://isaac-sim.github.io/IsaacLab) provides everything you need to get started, including
-detailed tutorials and step-by-step guides. Follow these links to learn more about:
-
-- [Installation steps](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/index.html#local-installation)
-- [Reinforcement learning](https://isaac-sim.github.io/IsaacLab/main/source/overview/reinforcement-learning/rl_existing_scripts.html)
-- [Tutorials](https://isaac-sim.github.io/IsaacLab/main/source/tutorials/index.html)
-- [Available environments](https://isaac-sim.github.io/IsaacLab/main/source/overview/environments.html)
-
-
-## Isaac Sim Version Dependency
-
-Isaac Lab is built on top of Isaac Sim and requires specific versions of Isaac Sim that are compatible with each
-release of Isaac Lab. Below, we outline the recent Isaac Lab releases and GitHub branches and their corresponding
-dependency versions for Isaac Sim.
-
-| Isaac Lab Version             | Isaac Sim Version   |
-| ----------------------------- | ------------------- |
-| `main` branch                 | Isaac Sim 4.5 / 5.0 |
-| `v2.2.X`                      | Isaac Sim 4.5 / 5.0 |
-| `v2.1.X`                      | Isaac Sim 4.5       |
-| `v2.0.X`                      | Isaac Sim 4.5       |
-
-
-## Contributing to Isaac Lab
-
-We wholeheartedly welcome contributions from the community to make this framework mature and useful for everyone.
-These may happen as bug reports, feature requests, or code contributions. For details, please check our
-[contribution guidelines](https://isaac-sim.github.io/IsaacLab/main/source/refs/contributing.html).
-
-## Show & Tell: Share Your Inspiration
-
-We encourage you to utilize our [Show & Tell](https://github.com/isaac-sim/IsaacLab/discussions/categories/show-and-tell)
-area in the `Discussions` section of this repository. This space is designed for you to:
-
-* Share the tutorials you've created
-* Showcase your learning content
-* Present exciting projects you've developed
-
-By sharing your work, you'll inspire others and contribute to the collective knowledge
-of our community. Your contributions can spark new ideas and collaborations, fostering
-innovation in robotics and simulation.
-
-## Troubleshooting
-
-Please see the [troubleshooting](https://isaac-sim.github.io/IsaacLab/main/source/refs/troubleshooting.html) section for
-common fixes or [submit an issue](https://github.com/isaac-sim/IsaacLab/issues).
-
-For issues related to Isaac Sim, we recommend checking its [documentation](https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/overview.html)
-or opening a question on its [forums](https://forums.developer.nvidia.com/c/agx-autonomous-machines/isaac/67).
-
-## Support
-
-* Please use GitHub [Discussions](https://github.com/isaac-sim/IsaacLab/discussions) for discussing ideas,
-  asking questions, and requests for new features.
-* Github [Issues](https://github.com/isaac-sim/IsaacLab/issues) should only be used to track executable pieces of
-  work with a definite scope and a clear deliverable. These can be fixing bugs, documentation issues, new features,
-  or general updates.
-
-## Connect with the NVIDIA Omniverse Community
-
-Do you have a project or resource you'd like to share more widely? We'd love to hear from you!
-Reach out to the NVIDIA Omniverse Community team at OmniverseCommunity@nvidia.com to explore opportunities
-to spotlight your work.
-
-You can also join the conversation on the [Omniverse Discord](https://discord.com/invite/nvidiaomniverse) to
-connect with other developers, share your projects, and help grow a vibrant, collaborative ecosystem
-where creativity and technology intersect. Your contributions can make a meaningful impact on the Isaac Lab
-community and beyond!
 
 ## License
 

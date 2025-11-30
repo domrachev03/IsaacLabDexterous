@@ -85,7 +85,7 @@ class UR10TessoloEventCfg(dexsuite.EventCfg):
         func=mdp.reset_joints_by_offset,
         mode="reset",
         params={
-            "asset_cfg": SceneEntityCfg("robot", joint_names=r"rl_dg_(1|2|3|4|5)_(1)"),
+            "asset_cfg": SceneEntityCfg("robot", joint_names=r"rj_dg_(1|2|3|4|5)_(1)"),
             "position_range": [0.0, 0.0],
             "velocity_range": [0.0, 0.0],
         },

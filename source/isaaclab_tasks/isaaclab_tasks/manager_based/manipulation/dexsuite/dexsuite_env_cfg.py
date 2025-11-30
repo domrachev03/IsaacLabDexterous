@@ -102,13 +102,13 @@ class VisibleSceneCfg(SceneCfg):
     rgbd_camera: TiledCameraCfg = TiledCameraCfg(
         prim_path="{ENV_REGEX_NS}/RGBDCamera",
         update_period=0,
-        height=240,
-        width=320,
+        height=120,
+        width=160,
         data_types=["rgb", "depth", "instance_id_segmentation_fast"],
         colorize_instance_id_segmentation=False,
         spawn=sim_utils.PinholeCameraCfg(focal_length=24.0, clipping_range=(0.1, 5.0)),
         offset=TiledCameraCfg.OffsetCfg(
-            pos=(-2.25, 0.0, 0.75),
+            pos=(-2.5, 0.0, 0.75),
             rot=(0.46579, -0.53202, 0.53202, -0.46579),
             convention="ros",
         ),

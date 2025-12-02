@@ -101,7 +101,7 @@ class VisibleSceneCfg(SceneCfg):
     # fixed RGBD camera that mirrors the viewer pose and looks at the workspace
     rgbd_camera: TiledCameraCfg = TiledCameraCfg(
         prim_path="{ENV_REGEX_NS}/RGBDCamera",
-        update_period=0,
+        update_period=1/30.,
         height=120,
         width=160,
         data_types=["rgb", "depth", "instance_id_segmentation_fast"],
@@ -498,10 +498,10 @@ class DexsuiteReorientEnvCfg(ManagerBasedEnvCfg):
         self.commands.object_pose.resampling_time_range = (10.0, 10.0)
         self.commands.object_pose.position_only = False
         self.commands.object_pose.success_visualizer_cfg.markers["failure"] = self.scene.table.spawn.replace(
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.25, 0.15, 0.15), roughness=0.25), visible=True
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.25, 0.15, 0.15), roughness=0.25), visible=False
         )
         self.commands.object_pose.success_visualizer_cfg.markers["success"] = self.scene.table.spawn.replace(
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.15, 0.25, 0.15), roughness=0.25), visible=True
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.15, 0.25, 0.15), roughness=0.25), visible=False
         )
 
         self.episode_length_s = 4.0

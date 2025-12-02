@@ -177,27 +177,7 @@ class object_point_cloud_b(ManagerTermBase):
 
 
 class visible_object_point_cloud_b(ManagerTermBase):
-    """Object surface point cloud built from the RGB-D camera-visible surface.
-
-    The class reuses the pre-sampled object surface points, projects them into the camera frame,
-    and filters them using both instance segmentation and depth consistency so that only
-    camera-visible surface points remain. The result is expressed in the reference asset frame,
-    matching the interface of :class:`object_point_cloud_b`.
-
-    Args (from ``cfg.params``):
-        object_cfg: Scene entity for the target object. Defaults to ``SceneEntityCfg("object")``.
-        ref_asset_cfg: Reference frame provider. Defaults to ``SceneEntityCfg("robot")``.
-        camera_cfg: Scene entity for the RGB-D camera. Defaults to ``SceneEntityCfg("rgbd_camera")``.
-        num_points: Number of visible points to output. Defaults to ``16``.
-        candidate_points: Number of pre-sampled surface points (>= num_points). Defaults to ``64``.
-        depth_key: Camera data output key for depth. Defaults to ``"depth"``.
-        segmentation_key: Camera data output key for instance IDs. Defaults to ``"instance_id_segmentation_fast"``.
-        depth_tolerance: Allowed absolute difference (m) between projected sample depth and camera depth.
-        visualize: Whether to draw the filtered points.
-
-    Returns (from ``__call__``):
-        Tensor of shape ``(num_envs, num_points, 3)`` (or flattened when requested).
-    """
+    """Object surface point cloud filtered by camera visibility and expressed in a reference asset's root frame."""
 
     def __init__(self, cfg, env: ManagerBasedRLEnv):
         super().__init__(cfg, env)
@@ -214,7 +194,6 @@ class visible_object_point_cloud_b(ManagerTermBase):
         self.object: RigidObject = env.scene[self.object_cfg.name]
         self.ref_asset: Articulation = env.scene[self.ref_asset_cfg.name]
         self.camera = env.scene.sensors[self.camera_cfg.name]
-        # visualizer (optional)
         if cfg.params.get("visualize", True):
             from isaaclab.markers import VisualizationMarkers
             from isaaclab.markers.config import RAY_CASTER_MARKER_CFG
@@ -224,7 +203,7 @@ class visible_object_point_cloud_b(ManagerTermBase):
             self.visualizer = VisualizationMarkers(ray_cfg)
         else:
             self.visualizer = None
-        # sample object surface points once and reuse
+
         candidate_points = max(candidate_points, self.num_points)
         self.points_local = sample_object_point_cloud(
             env.num_envs, candidate_points, self.object.cfg.prim_path, device=self._device
@@ -237,8 +216,6 @@ class visible_object_point_cloud_b(ManagerTermBase):
         self._env_id_matrix = torch.arange(env.num_envs, device=self._device).unsqueeze(1).repeat(1, self.num_candidates)
         self._fallback_indices = torch.arange(self.num_candidates, device=self._device)
         self._selected_indices = torch.full((env.num_envs, self.num_points), -1, dtype=torch.int64, device=self._device)
-        # self._height = self.camera.data.image_shape[0]
-        # self._width = self.camera.data.image_shape[1]
         self._height = getattr(self.camera.cfg, "height", 1)
         self._width = getattr(self.camera.cfg, "width", 1)
 
@@ -256,7 +233,6 @@ class visible_object_point_cloud_b(ManagerTermBase):
         flatten: bool = False,
         visualize: bool = True,
     ):
-        # keep interface-compatible kwargs but ignore overrides at runtime
         _ = (
             env,
             ref_asset_cfg,
@@ -285,12 +261,10 @@ class visible_object_point_cloud_b(ManagerTermBase):
         self.points_w = quat_apply(object_quat_w, self.points_local) + object_pos_w
 
     def _camera_data_ready(self) -> bool:
-        # ensure the camera buffers exist before attempting to read them
         outputs = self.camera.data.output
         return self.depth_key in outputs and self.segmentation_key in outputs
 
     def _compute_visibility_mask(self) -> torch.Tensor:
-        """Returns a boolean mask (num_envs, num_candidates) for camera-visible points."""
         cam_pos = self.camera.data.pos_w.unsqueeze(1)
         cam_quat = self.camera.data.quat_w_ros.unsqueeze(1).repeat(1, self.num_candidates, 1)
         points_cam = quat_apply_inverse(cam_quat, self.points_w - cam_pos)
@@ -347,35 +321,31 @@ class visible_object_point_cloud_b(ManagerTermBase):
         return visible_flat.view(valid.shape)
 
     def _select_visible_points(self, visible_mask: torch.Tensor) -> torch.Tensor:
+        num_envs = visible_mask.shape[0]
         selected = torch.zeros_like(self._visible_points_w)
-        for env_id in range(visible_mask.shape[0]):
-            candidate_indices = torch.nonzero(visible_mask[env_id], as_tuple=False).flatten()
-            candidate_list = candidate_indices.cpu().tolist()
-            visible_set = set(candidate_list)
-            chosen: list[int] = []
-            if visible_set:
-                # keep previously selected indices that remain visible to avoid flicker
-                prev = self._selected_indices[env_id].cpu().tolist()
-                for idx in prev:
-                    if idx in visible_set:
-                        chosen.append(idx)
-                # append additional visible indices deterministically (ascending order)
-                for idx in candidate_list:
-                    if len(chosen) >= self.num_points:
-                        break
-                    if idx not in chosen:
-                        chosen.append(idx)
-            # if no visible indices, fall back to deterministic candidate order
-            if not chosen:
-                fallback = self._fallback_indices.cpu().tolist()
-                chosen = fallback[: self.num_points]
-            # ensure required length by repeating deterministic order
-            if len(chosen) < self.num_points:
-                repeats = math.ceil(self.num_points / max(len(chosen), 1))
-                chosen = (chosen * repeats)[: self.num_points]
-            indices_tensor = torch.tensor(chosen, dtype=torch.int64, device=self._device)
-            self._selected_indices[env_id] = indices_tensor
-            selected[env_id] = self.points_w[env_id, indices_tensor]
+
+        for env_id in range(num_envs):
+            visible_idx = torch.nonzero(visible_mask[env_id], as_tuple=False).flatten()
+
+            if visible_idx.numel() == 0:
+                indices = self._fallback_indices[: self.num_points]
+            else:
+                prev = self._selected_indices[env_id]
+                keep = prev[(prev >= 0) & visible_mask[env_id, prev]]
+
+                need = self.num_points - keep.numel()
+                if need > 0:
+                    add = visible_idx[:need]
+                    if add.numel() < need:
+                        repeats = math.ceil(need / max(add.numel(), 1))
+                        add = add.repeat(repeats)[:need]
+                    indices = torch.cat((keep, add), dim=0)
+                else:
+                    indices = keep[: self.num_points]
+
+            self._selected_indices[env_id] = indices
+            selected[env_id] = self.points_w[env_id, indices]
+
         self._visible_points_w = selected
         return selected
 
@@ -414,7 +384,6 @@ class visible_object_point_cloud_b(ManagerTermBase):
                 self._object_instance_ids[idx] = matched_id
 
     def _extract_camera_info_entry(self, info_container, env_idx: int) -> dict:
-        """Fetch camera info for environment index, handling shared dict or per-env lists."""
         if isinstance(info_container, (list, tuple)):
             if 0 <= env_idx < len(info_container):
                 entry = info_container[env_idx]
@@ -438,6 +407,7 @@ class visible_object_point_cloud_b(ManagerTermBase):
                 if resolved:
                     return resolved
         return ""
+
 
 def fingers_contact_force_b(
     env: ManagerBasedRLEnv,

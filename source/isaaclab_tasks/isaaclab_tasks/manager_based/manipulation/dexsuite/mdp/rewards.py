@@ -63,7 +63,6 @@ def any_contact(
 
     contact_mags = [torch.norm(contact, dim=-1) for contact in tip_contact]
     good_contact_cond1 = torch.stack([mag > threshold for mag in contact_mags], dim=-1).any(dim=-1)
-
     return good_contact_cond1
 
 
@@ -101,6 +100,7 @@ def success_reward(
     rot_std: float | None = None,
     thumb_contact_name: str | list[str] = "thumb_finger_tip",
     tip_contact_names: tuple[str, ...] = ("index_finger_tip", "middle_finger_tip", "ring_finger_tip"),
+    threshold: float = 1.0,
 ) -> torch.Tensor:
     """Reward success by comparing commanded pose to the object pose using tanh kernels on error."""
 
@@ -119,7 +119,7 @@ def success_reward(
     return (
         (1 - torch.tanh(pos_dist / pos_std))
         * (1 - torch.tanh(rot_dist / rot_std))
-        * contacts(env, 1.0, thumb_contact_name, tip_contact_names).float()
+        * contacts(env, threshold, thumb_contact_name, tip_contact_names).float()
     )
 
 
@@ -131,6 +131,7 @@ def position_command_error_tanh(
     align_asset_cfg: SceneEntityCfg,
     thumb_contact_name: str | list[str] = "thumb_finger_tip",
     tip_contact_names: tuple[str, ...] = ("index_finger_tip", "middle_finger_tip", "ring_finger_tip"),
+    threshold: float = 1.0,
 ) -> torch.Tensor:
     """Reward tracking of commanded position using tanh kernel, gated by contact presence."""
 
@@ -141,7 +142,8 @@ def position_command_error_tanh(
     des_pos_b = command[:, :3]
     des_pos_w, _ = combine_frame_transforms(asset.data.root_pos_w, asset.data.root_quat_w, des_pos_b)
     distance = torch.norm(object.data.root_pos_w - des_pos_w, dim=1)
-    return (1 - torch.tanh(distance / std)) * contacts(env, 1.0, thumb_contact_name, tip_contact_names).float()
+    # print(f"Desired Position: {des_pos_w}, Current Position: {object.data.root_pos_w}, Distance: {distance}")
+    return (1 - torch.tanh(distance / std)) * contacts(env, threshold, thumb_contact_name, tip_contact_names).float()
 
 
 def orientation_command_error_tanh(

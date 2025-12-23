@@ -73,3 +73,11 @@ tests/
 !source/isaaclab_assets/data/robots/URTessoloAlik/ur10e_delto_optimized.usd
 !source/isaaclab_assets/data/robots/URTessoloAlik/ur10e_delto_optimized_separate_tips.usd
 !source/isaaclab_assets/data/robots/URTessoloAlik/ur10e_delto_optimized_separate_tips_limited_jnts.usd
+!source/isaaclab_assets/data/robots/URTessoloAlik/ur10e_delto_optimized_separate_tips_limited_jnts_self_collision.usd
+!source/isaaclab_assets/data/robots/panda_rohand.usd
+!source/isaaclab_assets/data/robots/panda_rohand_fingertips.usd
+!source/isaaclab_assets/data/robots/panda_rohand_fingertips_fixed.usd
+!source/isaaclab_assets/data/robots/panda_rohand_fingertips_fixed_palm_ft.usd
+!source/isaaclab_assets/data/robots/panda_rohand_simplified.usd
+!source/isaaclab_assets/data/robots/panda_rohand_simplified_ang_jnt.usd
+eval_results*.txt

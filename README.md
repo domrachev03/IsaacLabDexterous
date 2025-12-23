@@ -115,6 +115,77 @@ To run a trained policy, use the corresponding `play.py` script and point `--che
 python3 scripts/reinforcement_learning/rl_games/play.py --task Isaac-Dexsuite-UR10-Tessolo-Lift-v0 --num_envs 512 --checkpoint logs/rl_games/lift/<run_id>/nn/<checkpoint>.pth
 ```
 
+### Evaluation
+
+The evaluation scripts measure success rate across different object types in the multi-object manipulation tasks.
+
+**Success criteria** (from `pose_commands.py`):
+- Position error < 0.05 m (5 cm)
+- Orientation error < 0.5 rad (if not position-only mode)
+
+#### Evaluate a single object type
+
+Use `eval_object_success.py` to evaluate a specific object type by index:
+
+```bash
+# List all available object types
+python3 scripts/tools/eval_object_success.py \
+    --task Isaac-Dexsuite-Panda-RoHand-Lift-Play-v0 \
+    --list-objects
+
+# Evaluate object index 0 for 20 episodes
+python3 scripts/tools/eval_object_success.py \
+    --task Isaac-Dexsuite-Panda-RoHand-Lift-Play-v0 \
+    --checkpoint logs/panda_rohand_reorient_pbt_agi.pth \
+    --object-index 0 \
+    --episodes 20 \
+    --num-envs 8 \
+    --headless
+```
+
+**Arguments:**
+- `--task`: Task ID (use `*-Play-v0` variant)
+- `--checkpoint`: Path to trained checkpoint (.pth file)
+- `--object-index`: Index of object to evaluate (0-based, use `--list-objects` to see all)
+- `--episodes`: Number of episodes to run (default: 10)
+- `--num-envs`: Parallel environments (default: 8)
+- `--headless`: Run without GUI (faster)
+
+#### Evaluate all object types
+
+Use the batch script to evaluate all objects and produce a summary table:
+
+```bash
+./scripts/tools/run_all_object_eval.sh <checkpoint_path> [episodes_per_object] [num_envs]
+
+# Example:
+./scripts/tools/run_all_object_eval.sh logs/panda_rohand_reorient_pbt_agi.pth 20 8
+```
+
+This will:
+1. Automatically detect all object types in the task
+2. Run evaluation for each object sequentially
+3. Print a summary table at the end
+4. Save detailed results to `eval_results_<timestamp>.txt`
+
+**Example output:**
+```
+===========================================================================
+                        EVALUATION RESULTS TABLE
+===========================================================================
+Checkpoint: logs/panda_rohand_reorient_pbt_agi.pth
+Episodes per object: 20
+---------------------------------------------------------------------------
+| Index | Object Type                              | Success  | Rate       |
+---------------------------------------------------------------------------
+| 0     | CuboidCfg[0.050, 0.100, 0.100]           |  19/20   |   95.0%    |
+| 1     | CuboidCfg[0.050, 0.050, 0.100]           |  18/20   |   90.0%    |
+| ...   | ...                                      |  ...     |   ...      |
+---------------------------------------------------------------------------
+| ALL   | TOTAL                                    | 280/320  |   87.5%    |
+===========================================================================
+```
+
 
 ## License
 

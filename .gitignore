@@ -80,3 +80,4 @@ tests/
 !source/isaaclab_assets/data/robots/panda_rohand_fingertips_fixed_palm_ft.usd
 !source/isaaclab_assets/data/robots/panda_rohand_simplified.usd
 !source/isaaclab_assets/data/robots/panda_rohand_simplified_ang_jnt.usd
+eval_results*.txt

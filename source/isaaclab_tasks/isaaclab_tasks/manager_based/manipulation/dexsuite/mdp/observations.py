@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import math
 import torch
 from typing import TYPE_CHECKING
 
@@ -288,14 +287,14 @@ class visible_object_point_cloud_b(ManagerTermBase):
         
         self._ensure_instance_ids()
         
-        # Step 1: Get all visible object points from segmentation mask + depth
-        visible_points_w, visible_mask = self._sample_visible_points_from_mask()
+        # Step 1: Sample visible object points from segmentation mask + depth
+        sampled_points_w, sample_valid, _ = self._sample_visible_points_from_mask()
         
         # Step 2: Check visibility of currently tracked points
         tracked_visibility = self._check_tracked_visibility()
         
         # Step 3: Update tracked points - keep visible ones, replace invisible with new samples
-        self._update_tracked_points(visible_points_w, visible_mask, tracked_visibility)
+        self._update_tracked_points(sampled_points_w, sample_valid, tracked_visibility)
         
         return self._format_output(self._tracked_points_w, flatten, visualize)
 
@@ -304,11 +303,14 @@ class visible_object_point_cloud_b(ManagerTermBase):
         outputs = self.camera.data.output
         return self.depth_key in outputs and self.segmentation_key in outputs
 
-    def _sample_visible_points_from_mask(self) -> tuple[torch.Tensor, torch.Tensor]:
+    def _sample_visible_points_from_mask(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Sample 3D points from pixels where object is visible in segmentation mask.
         
+        Vectorized implementation that samples a fixed number of points per environment.
+        
         Returns:
-            visible_points_w: (num_envs, H*W, 3) - all back-projected points (zeros where not visible)
+            sampled_points_w: (num_envs, num_points, 3) - sampled visible points in world frame
+            sample_valid: (num_envs, num_points) - True if sample is valid (has visible pixels)
             visible_mask: (num_envs, H*W) - True where object is visible
         """
         depth = self.camera.data.output[self.depth_key][..., 0]  # (num_envs, H, W)
@@ -317,6 +319,7 @@ class visible_object_point_cloud_b(ManagerTermBase):
         # Flatten spatial dimensions
         depth_flat = depth.view(self._num_envs, -1)  # (num_envs, H*W)
         seg_flat = segmentation.view(self._num_envs, -1)  # (num_envs, H*W)
+        num_pixels = depth_flat.shape[1]
         
         # Create visibility mask: object instance matches AND valid depth
         object_ids = self._object_instance_ids.unsqueeze(1)  # (num_envs, 1)
@@ -324,39 +327,84 @@ class visible_object_point_cloud_b(ManagerTermBase):
         depth_valid = torch.isfinite(depth_flat) & (depth_flat > 0.0)
         visible_mask = instance_match & depth_valid  # (num_envs, H*W)
         
-        # Back-project visible pixels to 3D camera frame
+        # Count visible pixels per environment
+        visible_counts = visible_mask.sum(dim=1)  # (num_envs,)
+        has_visible = visible_counts > 0  # (num_envs,)
+        
+        # For environments with no visible pixels, we'll return invalid samples
+        # For others, we sample num_points indices from visible pixels
+        
+        # Strategy: Use random sampling with replacement from visible pixels
+        # Generate random indices and mask them to only select visible pixels
+        
+        # Create cumsum for weighted sampling - convert mask to float for cumsum
+        visible_float = visible_mask.float()  # (num_envs, H*W)
+        
+        # Uniform random values for sampling
+        rand_vals = torch.rand(self._num_envs, self.num_points, device=self._device)  # (num_envs, num_points)
+        
+        # Scale random values by count of visible pixels to get "which visible pixel" to pick
+        # target_idx[e, p] = floor(rand_vals[e, p] * visible_counts[e])
+        # This gives us which "k-th visible pixel" to select for each (env, point)
+        target_visible_idx = (rand_vals * visible_counts.unsqueeze(1).float()).long()  # (num_envs, num_points)
+        target_visible_idx = torch.clamp(target_visible_idx, min=0)  # Safety clamp
+        
+        # Now we need to find the actual pixel index for the k-th visible pixel
+        # Use cumsum to map k-th visible pixel to actual pixel index
+        cumsum = torch.cumsum(visible_float, dim=1)  # (num_envs, H*W)
+        
+        # For each (env, point), find pixel where cumsum > target_visible_idx
+        # This is essentially: pixel_idx = argmax(cumsum > target_visible_idx)
+        # Expand for broadcasting: cumsum (num_envs, H*W), target (num_envs, num_points)
+        cumsum_expanded = cumsum.unsqueeze(2)  # (num_envs, H*W, 1)
+        target_expanded = target_visible_idx.unsqueeze(1).float() + 0.5  # (num_envs, 1, num_points), +0.5 for "greater than"
+        
+        # Find first pixel where cumsum > target (i.e., we've passed the k-th visible pixel)
+        exceeds = cumsum_expanded > target_expanded  # (num_envs, H*W, num_points)
+        
+        # Get the first index that exceeds - use argmax on the boolean tensor
+        # argmax returns first True index along dim=1
+        sampled_pixel_idx = exceeds.to(torch.int8).argmax(dim=1)  # (num_envs, num_points)
+        
+        # Clamp to valid range
+        sampled_pixel_idx = torch.clamp(sampled_pixel_idx, 0, num_pixels - 1)
+        
+        # Gather depth values at sampled pixels
+        # sampled_pixel_idx: (num_envs, num_points)
+        sampled_depth = torch.gather(depth_flat, 1, sampled_pixel_idx)  # (num_envs, num_points)
+        
+        # Get u, v coordinates for sampled pixels
+        sampled_u = self._u_grid[sampled_pixel_idx]  # (num_envs, num_points)
+        sampled_v = self._v_grid[sampled_pixel_idx]  # (num_envs, num_points)
+        
         # Get camera intrinsics
         fx = self.camera.data.intrinsic_matrices[:, 0, 0].unsqueeze(-1)  # (num_envs, 1)
         fy = self.camera.data.intrinsic_matrices[:, 1, 1].unsqueeze(-1)
         cx = self.camera.data.intrinsic_matrices[:, 0, 2].unsqueeze(-1)
         cy = self.camera.data.intrinsic_matrices[:, 1, 2].unsqueeze(-1)
         
-        # Pixel coordinates (broadcast to all envs)
-        u = self._u_grid.unsqueeze(0).expand(self._num_envs, -1)  # (num_envs, H*W)
-        v = self._v_grid.unsqueeze(0).expand(self._num_envs, -1)
-        
-        # Back-project: camera frame coordinates
-        z_cam = depth_flat
-        x_cam = (u - cx) * z_cam / fx
-        y_cam = (v - cy) * z_cam / fy
-        
-        points_cam = torch.stack([x_cam, y_cam, z_cam], dim=-1)  # (num_envs, H*W, 3)
+        # Back-project to camera frame
+        z_cam = sampled_depth
+        x_cam = (sampled_u - cx) * z_cam / fx
+        y_cam = (sampled_v - cy) * z_cam / fy
+        points_cam = torch.stack([x_cam, y_cam, z_cam], dim=-1)  # (num_envs, num_points, 3)
         
         # Transform to world frame
         cam_pos_w = self.camera.data.pos_w.unsqueeze(1)  # (num_envs, 1, 3)
-        cam_quat_w = self.camera.data.quat_w_ros.unsqueeze(1).expand(-1, points_cam.shape[1], -1)  # (num_envs, H*W, 4)
+        cam_quat_w = self.camera.data.quat_w_ros.unsqueeze(1).expand(-1, self.num_points, -1)  # (num_envs, num_points, 4)
         
-        points_w = quat_apply(cam_quat_w, points_cam) + cam_pos_w  # (num_envs, H*W, 3)
+        sampled_points_w = quat_apply(cam_quat_w, points_cam) + cam_pos_w  # (num_envs, num_points, 3)
         
-        # Zero out invalid points
-        points_w = points_w * visible_mask.unsqueeze(-1).float()
+        # Mark validity - samples are valid only if environment has visible pixels
+        sample_valid = has_visible.unsqueeze(1).expand(-1, self.num_points)  # (num_envs, num_points)
         
-        return points_w, visible_mask
+        return sampled_points_w, sample_valid, visible_mask
 
     def _check_tracked_visibility(self) -> torch.Tensor:
         """Check if currently tracked points are still visible.
         
         Projects tracked points to camera and checks if they match segmentation + depth.
+        Fully vectorized implementation for performance.
         
         Returns:
             visibility: (num_envs, num_points) - True if tracked point is still visible
@@ -395,101 +443,97 @@ class visible_object_point_cloud_b(ManagerTermBase):
             & (v_idx >= 0) & (v_idx < self._height)
         )
         
-        # Initialize visibility as False
-        visibility = torch.zeros((self._num_envs, self.num_points), dtype=torch.bool, device=self._device)
+        # Clamp indices to valid range for gathering (will be masked out anyway)
+        u_idx_safe = torch.clamp(u_idx, 0, self._width - 1)
+        v_idx_safe = torch.clamp(v_idx, 0, self._height - 1)
         
-        if not in_bounds.any():
-            return visibility
-        
-        # Get depth and segmentation at projected locations
-        depth = self.camera.data.output[self.depth_key][..., 0]
+        # Get depth and segmentation
+        depth = self.camera.data.output[self.depth_key][..., 0]  # (num_envs, H, W)
         segmentation = self.camera.data.output[self.segmentation_key][..., 0].to(torch.int64)
         
-        # For valid projections, check depth and segmentation
-        depth_fail_count = 0
-        seg_fail_count = 0
-        for env_id in range(self._num_envs):
-            for pt_id in range(self.num_points):
-                if not (self._tracked_valid[env_id, pt_id] and in_bounds[env_id, pt_id]):
-                    continue
-                    
-                ui, vi = int(u_idx[env_id, pt_id]), int(v_idx[env_id, pt_id])
-                depth_val = depth[env_id, vi, ui]
-                seg_val = segmentation[env_id, vi, ui]
-                expected_depth = z[env_id, pt_id]
-                
-                depth_ok = torch.isfinite(depth_val) and abs(depth_val - expected_depth) < self.depth_tolerance
-                seg_ok = (self._object_instance_ids[env_id] < 0) or (seg_val == self._object_instance_ids[env_id])
-                
-                if not depth_ok:
-                    depth_fail_count += 1
-                if not seg_ok:
-                    seg_fail_count += 1
-                
-                visibility[env_id, pt_id] = depth_ok and seg_ok
+        # Vectorized gather: compute linear indices for (env, v, u) access
+        # depth[env_id, v_idx, u_idx] -> use advanced indexing
+        env_indices = torch.arange(self._num_envs, device=self._device).unsqueeze(1).expand(-1, self.num_points)
+        
+        # Gather depth and segmentation values at projected pixel locations
+        depth_at_proj = depth[env_indices, v_idx_safe, u_idx_safe]  # (num_envs, num_points)
+        seg_at_proj = segmentation[env_indices, v_idx_safe, u_idx_safe]  # (num_envs, num_points)
+        
+        # Check depth match
+        depth_ok = torch.isfinite(depth_at_proj) & (torch.abs(depth_at_proj - z) < self.depth_tolerance)
+        
+        # Check segmentation match (or object_id < 0 means accept any)
+        object_ids = self._object_instance_ids.unsqueeze(1)  # (num_envs, 1)
+        seg_ok = (object_ids < 0) | (seg_at_proj == object_ids)
+        
+        # Combine all conditions
+        visibility = in_bounds & self._tracked_valid & depth_ok & seg_ok
         
         return visibility
 
     def _update_tracked_points(
         self, 
-        visible_points_w: torch.Tensor, 
-        visible_mask: torch.Tensor,
+        sampled_points_w: torch.Tensor, 
+        sample_valid: torch.Tensor,
         tracked_visibility: torch.Tensor
     ):
         """Update tracked keypoints: keep visible ones, replace invisible with new samples.
         
+        Fully vectorized implementation.
+        
         Args:
-            visible_points_w: (num_envs, H*W, 3) - all visible points from mask
-            visible_mask: (num_envs, H*W) - visibility mask
+            sampled_points_w: (num_envs, num_points, 3) - newly sampled visible points
+            sample_valid: (num_envs, num_points) - True if sample is valid (env has visible pixels)
             tracked_visibility: (num_envs, num_points) - which tracked points are still visible
         """
-        total_kept = 0
-        total_replaced = 0
+        # Determine which tracked points to keep (still visible AND were valid)
+        keep_mask = tracked_visibility & self._tracked_valid  # (num_envs, num_points)
         
-        for env_id in range(self._num_envs):
-            # Find indices of visible pixels for this env
-            visible_indices = torch.nonzero(visible_mask[env_id], as_tuple=False).flatten()
-            
-            if visible_indices.numel() == 0:
-                # No visible points - keep tracked points but mark as invalid for replacement next frame
-                # Place at reference position to yield zeros in output
-                ref_pos = self.ref_asset.data.root_pos_w[env_id]
-                self._tracked_points_w[env_id] = ref_pos.unsqueeze(0).expand(self.num_points, -1)
-                self._tracked_valid[env_id] = False
-                continue
-            
-            # Get the visible 3D points for this env
-            env_visible_points = visible_points_w[env_id, visible_indices]  # (num_visible, 3)
-            
-            # Count how many tracked points are still visible
-            still_visible = tracked_visibility[env_id] & self._tracked_valid[env_id]
-            num_keep = still_visible.sum().item()
-            num_need = self.num_points - num_keep
-            
-            total_kept += num_keep
-            total_replaced += num_need
-            
-            if num_need > 0:
-                # Sample new points to replace invisible ones
-                num_available = env_visible_points.shape[0]
-                
-                # Randomly sample from visible points
-                if num_available >= num_need:
-                    perm = torch.randperm(num_available, device=self._device)[:num_need]
-                    new_points = env_visible_points[perm]
-                else:
-                    # Not enough visible points - repeat what we have
-                    repeats = math.ceil(num_need / max(num_available, 1))
-                    new_points = env_visible_points.repeat(repeats, 1)[:num_need]
-                
-                # Find slots that need replacement (not visible or not valid)
-                replace_mask = ~still_visible
-                replace_indices = torch.nonzero(replace_mask, as_tuple=False).flatten()[:num_need]
-                
-                # Update tracked points
-                for i, idx in enumerate(replace_indices):
-                    self._tracked_points_w[env_id, idx] = new_points[i]
-                    self._tracked_valid[env_id, idx] = True
+        # Determine which slots need replacement (not keeping)
+        needs_replacement = ~keep_mask  # (num_envs, num_points)
+        
+        # For environments with valid samples, replace non-kept slots with new samples
+        # For environments without valid samples, set to ref position and mark invalid
+        
+        # Get reference positions for invalid envs
+        ref_pos_w = self.ref_asset.data.root_pos_w.unsqueeze(1).expand(-1, self.num_points, -1)  # (num_envs, num_points, 3)
+        
+        # Check which environments have any valid samples
+        env_has_valid_samples = sample_valid.any(dim=1)  # (num_envs,)
+        
+        # Update points: use sampled points where needs_replacement AND sample_valid, else keep tracked
+        # For envs without valid samples, use ref_pos
+        
+        # Create the replacement values
+        # Where sample is valid and slot needs replacement -> use sampled_points_w
+        # Where sample is valid and slot doesn't need replacement -> keep tracked
+        # Where sample is not valid (env has no visible pixels) -> use ref_pos
+        
+        # Expand env_has_valid_samples for broadcasting
+        env_valid_expanded = env_has_valid_samples.unsqueeze(1).unsqueeze(2)  # (num_envs, 1, 1)
+        needs_replacement_expanded = needs_replacement.unsqueeze(2)  # (num_envs, num_points, 1)
+        
+        # Compute new tracked points
+        # If env has valid samples:
+        #   - If slot needs replacement: use sampled_points_w
+        #   - Else: keep self._tracked_points_w
+        # Else (no valid samples):
+        #   - Use ref_pos_w
+        
+        new_points = torch.where(
+            env_valid_expanded,
+            torch.where(needs_replacement_expanded, sampled_points_w, self._tracked_points_w),
+            ref_pos_w
+        )
+        
+        # Update validity mask
+        # If env has valid samples: all slots become valid (either kept or replaced)
+        # Else: all slots become invalid
+        new_valid = env_has_valid_samples.unsqueeze(1).expand(-1, self.num_points)
+        
+        # Write back
+        self._tracked_points_w = new_points
+        self._tracked_valid = new_valid
         
     def _format_output(self, points_w: torch.Tensor, flatten: bool, visualize: bool) -> torch.Tensor:
         """Transform points to reference frame and format output."""

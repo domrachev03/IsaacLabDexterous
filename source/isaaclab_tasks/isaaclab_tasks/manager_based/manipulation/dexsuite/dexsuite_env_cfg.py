@@ -101,9 +101,9 @@ class VisibleSceneCfg(SceneCfg):
     # fixed RGBD camera that mirrors the viewer pose and looks at the workspace
     rgbd_camera: TiledCameraCfg = TiledCameraCfg(
         prim_path="{ENV_REGEX_NS}/RGBDCamera",
-        update_period=1/30.,
-        height=120,
-        width=160,
+        update_period=0,
+        height=240,
+        width=320,
         data_types=["rgb", "depth", "instance_id_segmentation_fast"],
         colorize_instance_id_segmentation=False,
         spawn=sim_utils.PinholeCameraCfg(focal_length=24.0, clipping_range=(0.1, 5.0)),
@@ -184,7 +184,7 @@ class ObservationsCfg:
             func=mdp.object_point_cloud_b,
             noise=Unoise(n_min=-0.0, n_max=0.0),
             clip=(-2.0, 2.0),  # clamp between -2 m to 2 m
-            params={"num_points": 64, "flatten": True},
+            params={"num_points": 32, "flatten": True},
         )
 
         def __post_init__(self):
@@ -202,7 +202,7 @@ class ObservationsCfg:
         object_quat_b = ObsTerm(func=mdp.object_quat_b)
         object_shape_point_cloud = ObsTerm(
             func=mdp.object_point_cloud_b,
-            params={"num_points": 64, "flatten": True, "visualize": False},
+            params={"num_points": 32, "flatten": True, "visualize": False},
         )
 
         def __post_init__(self):
@@ -237,7 +237,7 @@ class VisibleObservationsCfg(ObservationsCfg):
             func=mdp.visible_object_point_cloud_b,
             noise=Unoise(n_min=-0.0, n_max=0.0),
             clip=(-2.0, 2.0),
-            params={"num_points": 32, "candidate_points": 128, "flatten": True},
+            params={"num_points": 32, "flatten": True},
         )
         
         def __post_init__(self):
@@ -498,10 +498,10 @@ class DexsuiteReorientEnvCfg(ManagerBasedEnvCfg):
         self.commands.object_pose.resampling_time_range = (10.0, 10.0)
         self.commands.object_pose.position_only = False
         self.commands.object_pose.success_visualizer_cfg.markers["failure"] = self.scene.table.spawn.replace(
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.25, 0.15, 0.15), roughness=0.25), visible=False
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.25, 0.15, 0.15), roughness=0.25), visible=True
         )
         self.commands.object_pose.success_visualizer_cfg.markers["success"] = self.scene.table.spawn.replace(
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.15, 0.25, 0.15), roughness=0.25), visible=False
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.15, 0.25, 0.15), roughness=0.25), visible=True
         )
 
         self.episode_length_s = 4.0

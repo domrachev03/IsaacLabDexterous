@@ -63,7 +63,6 @@ params:
     normalize_advantage: True
     gamma: 0.99
     tau: 0.95
-    learning_rate: 1e-3
     lr_schedule: adaptive
     schedule_type: legacy
     kl_threshold: 0.01
@@ -73,7 +72,6 @@ params:
     save_frequency: 50
     print_stats: True
     grad_norm: 1.0
-    entropy_coef: 0.001
     truncate_grads: True
     e_clip: 0.2
     horizon_length: 36
@@ -83,20 +81,42 @@ params:
     clip_value: True
     clip_actions: False
     seq_len: 4
+    
+    # PBT 1
+    learning_rate: 1e-3
+    entropy_coef: 0.001
     bounds_loss_coef: 0.0001
+    
+    ## PBT 2
+    # learning_rate: 7e-4
+    # entropy_coef: 0.0005
+    # bounds_loss_coef: 0.0001
+    
+    ## PBT 3
+    # learning_rate: 3e-4
+    # entropy_coef: 0.002
+    # bounds_loss_coef: 0.0002
+    
+    ## PBT 4
+    # learning_rate: 5e-4
+    # entropy_coef: 0.001
+    # bounds_loss_coef: 0.00005
 
 pbt:
-  enabled: False
+  enabled: True
   policy_idx: 0  # policy index in a population
-  num_policies: 8  # total number of policies in the population
+  # policy_idx: 1  # policy index in a population
+  # policy_idx: 2  # policy index in a population
+  # policy_idx: 3  # policy index in a population
+  num_policies: 4  # total number of policies in the population
   directory: .
-  workspace: "pbt_workspace"  # suffix of the workspace dir name inside train_dir
+  workspace: "pbt_workspace_no_diverg"  # suffix of the workspace dir name inside train_dir
   objective: episode.Curriculum/adr
 
   # PBT hyperparams
-  interval_steps: 50000000
-  threshold_std: 0.1
-  threshold_abs: 0.025
+  interval_steps: 1000000
+  threshold_std: 0.01
+  threshold_abs: 0.0025
   mutation_rate: 0.25
   change_range: [1.1, 2.0]
   mutation:
@@ -109,4 +129,3 @@ pbt:
     agent.params.config.kl_threshold: "mutate_float"
     agent.params.config.gamma: "mutate_discount"
     agent.params.config.tau: "mutate_discount"
-

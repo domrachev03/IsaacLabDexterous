@@ -15,6 +15,7 @@ from rl_games.common.algo_observer import AlgoObserver
 from . import pbt_utils
 from .mutation import mutate
 from .pbt_cfg import PbtCfg
+from subprocess import call
 
 # i.e. value for target objective when it is not known
 _UNINITIALIZED_VALUE = float(-1e9)
@@ -204,7 +205,7 @@ class PbtAlgoObserver(AlgoObserver):
         # Get the directory of the current file
         thisfile_dir = os.path.dirname(os.path.abspath(__file__))
         isaac_sim_path = os.path.abspath(os.path.join(thisfile_dir, "../../../../../_isaac_sim"))
-        command = [f"{isaac_sim_path}/python.sh"]
+        command = [f"/root/miniconda3/envs/isaaclab/bin/python3"]
 
         if self.distributed_args.distributed:
             self.distributed_args.master_port = str(pbt_utils.find_free_port())
@@ -223,19 +224,19 @@ class PbtAlgoObserver(AlgoObserver):
             pbt_utils.dump_env_sizes()
 
             # after any sourcing (or before exec’ing python.sh) prevent kept increasing arg_length:
-            for var in ("PATH", "PYTHONPATH", "LD_LIBRARY_PATH", "OMNI_USD_RESOLVER_MDL_BUILTIN_PATHS"):
-                val = os.environ.get(var)
-                if not val or os.pathsep not in val:
-                    continue
-                seen = set()
-                new_parts = []
-                for p in val.split(os.pathsep):
-                    if p and p not in seen:
-                        seen.add(p)
-                        new_parts.append(p)
-                os.environ[var] = os.pathsep.join(new_parts)
+            # for var in ("PATH", "PYTHONPATH", "LD_LIBRARY_PATH", "OMNI_USD_RESOLVER_MDL_BUILTIN_PATHS"):
+            #     val = os.environ.get(var)
+            #     if not val or os.pathsep not in val:
+            #         continue
+            #     seen = set()
+            #     new_parts = []
+            #     for p in val.split(os.pathsep):
+            #         if p and p not in seen:
+            #             seen.add(p)
+            #             new_parts.append(p)
+            #     os.environ[var] = os.pathsep.join(new_parts)
 
-            os.execv(f"{isaac_sim_path}/python.sh", command)
+            os.system(" ".join(command))
 
 
 class MultiObserver(AlgoObserver):

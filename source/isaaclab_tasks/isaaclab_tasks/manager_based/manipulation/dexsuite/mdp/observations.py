@@ -331,46 +331,21 @@ class visible_object_point_cloud_b(ManagerTermBase):
         visible_counts = visible_mask.sum(dim=1)  # (num_envs,)
         has_visible = visible_counts > 0  # (num_envs,)
         
-        # For environments with no visible pixels, we'll return invalid samples
-        # For others, we sample num_points indices from visible pixels
+        # Use multinomial sampling - it's memory efficient and designed for this
+        # For envs with no visible pixels, we need to handle specially
+        # Create weights: visible pixels get weight 1, others get 0
+        # For envs with all zeros, add small uniform weight to avoid multinomial error
+        weights = visible_mask.float()  # (num_envs, H*W)
+
+        # For envs with no visible pixels, set uniform weights (will be marked invalid anyway)
+        no_visible_mask = ~has_visible  # (num_envs,)
+        if no_visible_mask.any():
+            weights[no_visible_mask] = 1.0 / num_pixels
         
-        # Strategy: Use random sampling with replacement from visible pixels
-        # Generate random indices and mask them to only select visible pixels
-        
-        # Create cumsum for weighted sampling - convert mask to float for cumsum
-        visible_float = visible_mask.float()  # (num_envs, H*W)
-        
-        # Uniform random values for sampling
-        rand_vals = torch.rand(self._num_envs, self.num_points, device=self._device)  # (num_envs, num_points)
-        
-        # Scale random values by count of visible pixels to get "which visible pixel" to pick
-        # target_idx[e, p] = floor(rand_vals[e, p] * visible_counts[e])
-        # This gives us which "k-th visible pixel" to select for each (env, point)
-        target_visible_idx = (rand_vals * visible_counts.unsqueeze(1).float()).long()  # (num_envs, num_points)
-        target_visible_idx = torch.clamp(target_visible_idx, min=0)  # Safety clamp
-        
-        # Now we need to find the actual pixel index for the k-th visible pixel
-        # Use cumsum to map k-th visible pixel to actual pixel index
-        cumsum = torch.cumsum(visible_float, dim=1)  # (num_envs, H*W)
-        
-        # For each (env, point), find pixel where cumsum > target_visible_idx
-        # This is essentially: pixel_idx = argmax(cumsum > target_visible_idx)
-        # Expand for broadcasting: cumsum (num_envs, H*W), target (num_envs, num_points)
-        cumsum_expanded = cumsum.unsqueeze(2)  # (num_envs, H*W, 1)
-        target_expanded = target_visible_idx.unsqueeze(1).float() + 0.5  # (num_envs, 1, num_points), +0.5 for "greater than"
-        
-        # Find first pixel where cumsum > target (i.e., we've passed the k-th visible pixel)
-        exceeds = cumsum_expanded > target_expanded  # (num_envs, H*W, num_points)
-        
-        # Get the first index that exceeds - use argmax on the boolean tensor
-        # argmax returns first True index along dim=1
-        sampled_pixel_idx = exceeds.to(torch.int8).argmax(dim=1)  # (num_envs, num_points)
-        
-        # Clamp to valid range
-        sampled_pixel_idx = torch.clamp(sampled_pixel_idx, 0, num_pixels - 1)
+        # Sample pixel indices using multinomial (with replacement)
+        sampled_pixel_idx = torch.multinomial(weights, self.num_points, replacement=True)  # (num_envs, num_points)
         
         # Gather depth values at sampled pixels
-        # sampled_pixel_idx: (num_envs, num_points)
         sampled_depth = torch.gather(depth_flat, 1, sampled_pixel_idx)  # (num_envs, num_points)
         
         # Get u, v coordinates for sampled pixels

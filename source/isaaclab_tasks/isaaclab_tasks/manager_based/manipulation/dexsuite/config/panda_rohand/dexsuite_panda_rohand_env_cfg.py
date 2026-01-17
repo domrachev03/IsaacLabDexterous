@@ -210,3 +210,24 @@ class DexsuitePandaRoHandLiftEnvCfg(PandaRoHandMixinCfg, dexsuite.DexsuiteLiftEn
 @configclass
 class DexsuitePandaRoHandLiftEnvCfg_PLAY(PandaRoHandMixinCfg, dexsuite.DexsuiteLiftEnvCfg_PLAY):
     pass
+
+
+# Vision-based (Visible) environments with point cloud observations
+@configclass
+class DexsuitePandaRoHandReorientVisibleEnvCfg(PandaRoHandMixinCfg, dexsuite.DexsuiteReorientVisibleEnvCfg):
+    pass
+
+
+@configclass
+class DexsuitePandaRoHandReorientVisibleEnvCfg_PLAY(PandaRoHandMixinCfg, dexsuite.DexsuiteReorientVisibleEnvCfg_PLAY):
+    pass
+
+
+@configclass
+class DexsuitePandaRoHandLiftVisibleEnvCfg(PandaRoHandMixinCfg, dexsuite.DexsuiteLiftVisibleEnvCfg):
+    pass
+
+
+@configclass
+class DexsuitePandaRoHandLiftVisibleEnvCfg_PLAY(PandaRoHandMixinCfg, dexsuite.DexsuiteLiftVisibleEnvCfg_PLAY):
+    pass

@@ -38,3 +38,10 @@ class DexsuitePandaRoHandPPORunnerCfg(RslRlOnPolicyRunnerCfg):
         max_grad_norm=1.0,
     )
 
+
+@configclass
+class DexsuitePandaRoHandVisiblePPORunnerCfg(DexsuitePandaRoHandPPORunnerCfg):
+    obs_groups = {
+        "policy": ["policy", "proprio", "perception"],
+        "critic": ["policy", "proprio", "perception", "critic_privileged"],
+    }

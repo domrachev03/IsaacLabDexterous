@@ -2,16 +2,25 @@
 # Record inference video for each object using record_object_inference.py
 #
 # Usage:
-#   ./scripts/tools/record_all_object_videos.sh <checkpoint_path> [output_dir] [num_envs] [video_length]
+#   ./scripts/tools/record_all_object_videos.sh <checkpoint_path> [output_dir] [num_envs] [video_length] [enable_cameras]
 #
 # Example:
 #   ./scripts/tools/record_all_object_videos.sh logs/panda_rohand_reorient_pbt_agi.pth recordings 1 800
+#   ./scripts/tools/record_all_object_videos.sh logs/panda_rohand_reorient_pbt_agi.pth recordings 1 800 true
 
 CHECKPOINT=${1:-"logs/panda_rohand_reorient_pbt_agi.pth"}
 OUT_DIR=${2:-"recordings"}
 NUM_ENVS=${3:-1}
 VIDEO_LENGTH=${4:-800}
+ENABLE_CAMERAS=${5:-"false"}
 TASK="Isaac-Dexsuite-Panda-RoHand-Lift-Play-v0"
+
+# Prepare camera flag
+CAMERA_FLAG=""
+if [ "$ENABLE_CAMERAS" = "true" ] || [ "$ENABLE_CAMERAS" = "1" ]; then
+    CAMERA_FLAG="--enable_cameras"
+    TASK="Isaac-Dexsuite-UR10-Tessolo-Lift-Visible-Play-v0"
+fi
 
 echo "==================================================="
 echo "Recording object videos"
@@ -19,6 +28,7 @@ echo "Checkpoint: $CHECKPOINT"
 echo "Output directory: $OUT_DIR"
 echo "Num envs: $NUM_ENVS"
 echo "Video length: $VIDEO_LENGTH"
+echo "Enable cameras: $ENABLE_CAMERAS"
 echo "Task: $TASK"
 echo "==================================================="
 
@@ -53,7 +63,8 @@ for i in $(seq 0 $((NUM_OBJECTS - 1))); do
         --num-envs $NUM_ENVS \
         --video-folder "$OUT_DIR" \
         --video-length $VIDEO_LENGTH \
-        --headless
+        --headless 2>&1 \
+        $CAMERA_FLAG
     
     echo ""
 done

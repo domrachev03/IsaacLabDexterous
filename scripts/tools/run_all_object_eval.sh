@@ -2,15 +2,24 @@
 # Run eval_object_success.py for all objects and collect results
 #
 # Usage:
-#   ./scripts/tools/run_all_object_eval.sh <checkpoint_path> [episodes_per_object] [num_envs]
+#   ./scripts/tools/run_all_object_eval.sh <checkpoint_path> [episodes_per_object] [num_envs] [enable_cameras]
 #
 # Example:
 #   ./scripts/tools/run_all_object_eval.sh logs/panda_rohand_reorient_pbt_agi.pth 20 8
+#   ./scripts/tools/run_all_object_eval.sh logs/panda_rohand_reorient_pbt_agi.pth 20 8 true
 
 CHECKPOINT=${1:-"logs/panda_rohand_reorient_pbt_agi.pth"}
 EPISODES=${2:-20}
 NUM_ENVS=${3:-8}
+ENABLE_CAMERAS=${4:-"false"}
 TASK="Isaac-Dexsuite-Panda-RoHand-Lift-Play-v0"
+
+# Prepare camera flag
+CAMERA_FLAG=""
+if [ "$ENABLE_CAMERAS" = "true" ] || [ "$ENABLE_CAMERAS" = "1" ]; then
+    CAMERA_FLAG="--enable_cameras"
+    TASK="Isaac-Dexsuite-UR10-Tessolo-Lift-Visible-Play-v0"
+fi
 
 # Output file for results
 RESULTS_FILE="eval_results_$(date +%Y%m%d_%H%M%S).txt"
@@ -20,6 +29,7 @@ echo "Running object evaluation"
 echo "Checkpoint: $CHECKPOINT"
 echo "Episodes per object: $EPISODES"
 echo "Num envs: $NUM_ENVS"
+echo "Enable cameras: $ENABLE_CAMERAS"
 echo "Task: $TASK"
 echo "Results file: $RESULTS_FILE"
 echo "==================================================="
@@ -29,7 +39,8 @@ echo "Getting object list..."
 NUM_OBJECTS=$(python3 scripts/tools/eval_object_success.py \
     --task $TASK \
     --list-objects \
-    --headless 2>/dev/null | grep "Total:" | awk '{print $2}')
+    --headless \
+    $CAMERA_FLAG 2>/dev/null | grep "Total:" | awk '{print $2}')
 
 if [ -z "$NUM_OBJECTS" ]; then
     echo "ERROR: Could not determine number of objects"
@@ -69,7 +80,8 @@ for i in $(seq 0 $((NUM_OBJECTS - 1))); do
         --object-index $i \
         --episodes $EPISODES \
         --num-envs $NUM_ENVS \
-        --headless 2>&1)
+        --headless 2>&1 \
+        $CAMERA_FLAG)
     
     # Extract parseable result
     RESULT=$(echo "$OUTPUT" | grep "PARSEABLE_RESULT" | tail -1)

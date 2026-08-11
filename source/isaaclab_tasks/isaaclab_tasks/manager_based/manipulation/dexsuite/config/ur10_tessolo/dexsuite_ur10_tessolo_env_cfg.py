@@ -145,9 +145,24 @@ class UR10TessoloMixinCfg:
             "robot", joint_names=["wrist_3_joint"]
         )
 
+        # Contact-force gate on the two dominant reward terms, stated explicitly at the value they
+        # already had. Both `success_reward` and `position_command_error_tanh` take a `threshold`
+        # argument defaulting to 1.0 N, and this config never set it, so the terms silently gated at
+        # 1.0 while every term the config *does* configure gates at 0.2 (see good_finger_contact and
+        # friends below). panda_rohand's author lowered both of these to 0.2; kuka_allegro left them
+        # at 1.0. Writing the default out changes no behaviour, but it makes the knob reachable from
+        # the command line: IsaacLab's update_class_from_dict refuses any key that is not already
+        # present in the dataclass, so a hydra `+env.rewards.success.params.threshold=` override
+        # fails with "Key not found under namespace" unless the key exists here first.
+        self.rewards.position_tracking.params["threshold"] = 1.0
+        self.rewards.success.params["threshold"] = 1.0
+
         self.rewards.position_tracking.params["thumb_contact_name"] = self.thumb_contact_name
         self.rewards.position_tracking.params["tip_contact_names"] = self.tip_contact_names
 
+        # NOTE: orientation_command_error_tanh has no `threshold` parameter at all -- it calls
+        # contacts(env, 1.0, ...) with a hardcoded literal -- so its gate cannot be exposed the same
+        # way. It is None for the Lift task, so this only matters for Reorient.
         if self.rewards.orientation_tracking:
             self.rewards.orientation_tracking.params["thumb_contact_name"] = self.thumb_contact_name
             self.rewards.orientation_tracking.params["tip_contact_names"] = self.tip_contact_names

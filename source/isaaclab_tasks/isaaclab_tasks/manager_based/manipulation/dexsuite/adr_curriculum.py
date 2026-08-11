@@ -90,6 +90,10 @@ class CurriculumCfg:
         },
     )
 
+    # NOTE: min/max final_value must stay symmetric (as with every other pair in this file). uniform_noise()
+    # (isaaclab/utils/noise/noise_model.py) computes data + rand() * (n_max - n_min) + n_min: if n_max == n_min
+    # the sampled width collapses to zero and the "noise" degenerates into a constant bias instead of the
+    # intended uniform jitter.
     object_obs_unoise_min_adr = CurrTerm(
         func=mdp.modify_term_cfg,
         params={
@@ -104,7 +108,7 @@ class CurriculumCfg:
         params={
             "address": "observations.perception.object_point_cloud.noise.n_max",
             "modify_fn": mdp.initial_final_interpolate_fn,
-            "modify_params": {"initial_value": 0.0, "final_value": -0.01, "difficulty_term_str": "adr"},
+            "modify_params": {"initial_value": 0.0, "final_value": 0.01, "difficulty_term_str": "adr"},
         },
     )
 

@@ -81,6 +81,12 @@ tests/
 !source/isaaclab_assets/data/robots/panda_rohand_simplified.usd
 !source/isaaclab_assets/data/robots/panda_rohand_simplified_ang_jnt.usd
 !source/isaaclab_assets/data/robots/URTessoloAlik/tessolo_hand_limited_jnts_self_collision.usd
+# FurnitureBench square table leg (200 mm), the dexsuite manipuland. Both lines are needed:
+# make_instanceable stores the geometry payload in the Props/ sidecar, and a missing sidecar
+# breaks only on a fresh clone -- the same way dg5f_my.usd did.
+!source/isaaclab_assets/data/props/FurnitureBench/SquareTableLeg200mm/square_table_leg4_200mm.usd
+!source/isaaclab_assets/data/props/FurnitureBench/SquareTableLeg200mm/Props/instanceable_meshes.usd
+
 eval_results*.txt
 .beads
 AGENTS.md

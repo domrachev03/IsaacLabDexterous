@@ -54,6 +54,47 @@ reprint of these same numbers computed live from whatever OBJ paths are passed o
     runtime (see ``--mass``) precisely so this implausibility stays visible instead of being silently
     baked into a USD file.
 
+WHY THE MERGED MESH IS RECENTRED TO ITS VOLUME CENTROID BEFORE CONVERSION (``--recenter-to-centroid``,
+default ON):
+    The raw combined mesh above is NOT centred on its own coordinate origin: its long-axis (X) bbox
+    runs [-0.04375, 0.15625] m, so the geometric bbox centre sits at x=+0.05625 m and the
+    tetra-volume-weighted centroid at x=+0.062453 m -- both far from x=0. Left uncorrected, the prim
+    origin MeshConverter bakes into the USD (and therefore this asset's PhysX rigid-body LINK frame)
+    sits ~6.2 cm away from where PhysX actually derives the centre of mass from the collision mesh.
+
+    That is not merely untidy -- it corrupts every distance this project measures off the object:
+      * ``RigidObjectData.root_pos_w`` is documented as an alias for ``root_link_pos_w`` (the prim's
+        own origin, i.e. the LINK frame) -- see ``isaaclab/assets/rigid_object/rigid_object_data.py``
+        -- not ``root_com_pos_w``. dexsuite's ``mdp.rewards.success_reward``,
+        ``mdp.rewards.position_command_error_tanh``, and ``mdp.curriculums.DifficultyScheduler`` all
+        read ``object.data.root_pos_w`` directly as "the object's position".
+      * The Lift task (``DexsuiteLiftEnvCfg.__post_init__``) sets ``rewards.success.params["rot_std"]
+        = None`` and ``curriculum.adr.params["rot_tol"] = None`` -- orientation is completely
+        unconstrained, so this leg is free to tumble.
+      * Success tolerance is ``pos_std / 2`` with ``pos_std = 0.1`` m, i.e. a 0.05 m radius -- SMALLER
+        than the ~0.0625 m origin-to-centroid offset above. As the leg rotates freely, the tracked
+        point (the off-centre origin) sweeps an arc of radius ~0.0625 m about the true, physically
+        meaningful centre, i.e. up to ~0.125 m of pure orientation artifact in the reported distance --
+        more than twice the success radius. A policy can be scored successful with the leg ~12 cm from
+        the goal, or scored failed despite placing it correctly. The same corrupted distance drives the
+        ADR gravity/difficulty curriculum, so the curriculum is corrupted too, not just the metric.
+      * Every primitive in the baseline (``CuboidCfg``/``SphereCfg``/``CapsuleCfg``/``ConeCfg``,
+        including a 0.2 m capsule) is centred at its own local origin by construction, so the baseline
+        is orientation-invariant in exactly this sense and this leg, unrecentred, was not -- a defect
+        in how this asset is authored, not an inherent property of an elongated object.
+
+    The fix translates the merged mesh (at the merge stage, before ``MeshConverter`` ever sees it) so
+    the prim origin coincides with the VOLUME CENTROID, not the bbox centre. PhysX derives a rigid
+    body's centre of mass from its collision mesh, so placing the link frame at the volume centroid
+    makes ``root_pos_w`` coincide with the true centre of mass -- and a rotation about the centre of
+    mass does not translate the tracked point at all, which is exactly the property being restored.
+    (The bbox centre would NOT have this property: it is a property of the mesh's axis-aligned extent,
+    not of its mass distribution, and the two differ here -- 0.05625 m vs 0.062453 m -- because the
+    threaded end is a distinct, partially-hollowed geometry, not a mirror image of the plain rod end.)
+
+    Pass ``--no-recenter-to-centroid`` to reproduce the old (off-centre) behaviour, e.g. for a direct
+    before/after comparison; there is no other reason to disable this.
+
 WHY THE DEFAULT COLLISION APPROXIMATION IS NOT convexHull:
     The leg is a thin, mostly-square rod with a threaded relief cut into one end (see the mass split
     above: the threaded 25mm end is a separate, geometrically hollowed-out piece from the plain 175mm
@@ -132,6 +173,22 @@ parser.add_argument(
     help="Mass (kg) to bake into the rigid body. Defaults to the previous campaign's measured value.",
 )
 parser.add_argument(
+    "--no-recenter-to-centroid",
+    action="store_false",
+    dest="recenter_to_centroid",
+    default=True,
+    help=(
+        "Disable recentring the merged mesh so its prim origin coincides with its volume centroid"
+        " (default: recentring is ON). See the module docstring's 'WHY THE MERGED MESH IS RECENTRED'"
+        " section for why the default is on: without it, root_pos_w (the PhysX LINK frame, which is"
+        " what every success/curriculum term in this repo reads) sits ~6.2 cm from the true centre of"
+        " mass, and free rotation (this task leaves orientation unconstrained) turns that offset into"
+        " up to ~12.5 cm of pure rotation artifact in every distance measured off this object -- more"
+        " than twice the 5 cm success radius. Only disable this to reproduce the old, defective"
+        " off-centre-origin USD for an explicit before/after comparison."
+    ),
+)
+parser.add_argument(
     "--hull-vertex-limit",
     type=int,
     default=64,
@@ -167,10 +224,11 @@ parser.add_argument(
     type=float,
     default=0.001,
     help=(
-        "Max allowed |diff| (m), per axis, between the converted USD's world-space bbox extent and"
-        " the measured source (combined, welded) extent. MeshConverter's use_meter_as_world_unit flag"
-        " is a documented no-op (see mesh_converter.py), so this is a round-trip sanity check that the"
-        " converted geometry was not silently mis-scaled -- not a cosmetic warning."
+        "Max allowed |diff| (m), per axis, between the converted USD's world-space bbox and the"
+        " measured source (combined, welded) bbox -- both its extent (mis-scale check;"
+        " MeshConverter's use_meter_as_world_unit flag is a documented no-op, see mesh_converter.py)"
+        " and its position after the recentring translation is applied (did-recentring-survive check;"
+        " see --no-recenter-to-centroid). Not a cosmetic warning -- both are asserted."
     ),
 )
 parser.add_argument(
@@ -314,20 +372,30 @@ def _mesh_stats(name: str, verts: list[list[float]], tris: list[list[int]]) -> d
     return result
 
 
-def _merge_obj(
-    body_path: str, thread_path: str, out_path: str
-) -> tuple[list[list[float]], list[list[int]]]:
-    """Weld the body + thread OBJs into a single triangle-soup OBJ for the mesh converter.
+def _merge_obj(body_path: str, thread_path: str) -> tuple[list[list[float]], list[list[int]]]:
+    """Weld the body + thread OBJs into a single triangle soup, in memory (no disk write).
 
     The two parts are already defined in the same local frame (see module docstring), so this is a
-    plain vertex-index-offset concatenation -- no transform is applied.
+    plain vertex-index-offset concatenation -- no transform is applied here. Any recentring translation
+    is applied separately by :func:`_translate_verts` so the un-translated and translated mesh stats can
+    both be measured and printed (see ``main()``).
     """
     vb, fb = _load_obj_positions_and_tris(body_path)
     vt, ft = _load_obj_positions_and_tris(thread_path)
     offset = len(vb)
     verts = vb + vt
     tris = fb + [[a + offset, b + offset, c + offset] for a, b, c in ft]
+    return verts, tris
 
+
+def _translate_verts(verts: list[list[float]], offset: list[float]) -> list[list[float]]:
+    """Return ``verts`` translated by ``-offset`` (used to move the volume centroid to the origin)."""
+    ox, oy, oz = offset
+    return [[x - ox, y - oy, z - oz] for x, y, z in verts]
+
+
+def _write_obj(verts: list[list[float]], tris: list[list[int]], out_path: str) -> None:
+    """Write a triangle-soup OBJ (positions only) to ``out_path``."""
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "w") as f:
         f.write("# merged: body + thread, generated by scripts/tools/convert_table_leg.py\n")
@@ -335,26 +403,50 @@ def _merge_obj(
             f.write(f"v {x:.9f} {y:.9f} {z:.9f}\n")
         for a, b, c in tris:
             f.write(f"f {a + 1} {b + 1} {c + 1}\n")
-    return verts, tris
 
 
-def _verify_converted_usd_extent(usd_path: str, expected_extent: list[float], tolerance: float) -> None:
-    """Round-trip check: re-open the CONVERTED USD and compare its world-space bbox extent against
-    the measured SOURCE (combined, welded) OBJ extent.
+def _verify_converted_usd_geometry(
+    usd_path: str,
+    source_bbox_min: list[float],
+    source_bbox_max: list[float],
+    applied_translation: list[float],
+    tolerance: float,
+) -> None:
+    """Round-trip check: re-open the CONVERTED USD and compare its world-space bbox against the
+    measured SOURCE (combined, welded) OBJ bbox, ``applied_translation`` (the recentring shift fed into
+    the merged OBJ, or ``[0, 0, 0]`` when ``--no-recenter-to-centroid`` was passed) applied.
 
-    This script leaves ``MeshConverterCfg.scale`` at the default ``(1, 1, 1)`` on the reasoning that
-    the source OBJ coordinates are already SI metres (see module docstring's MEASURED GEOMETRY
-    section) -- but that reasoning is about the *input*, not the *output*. MeshConverter's own
-    ``use_meter_as_world_unit`` flag is a documented no-op (mesh_converter.py: "This does not work
-    right now :(, so we need to scale the mesh manually"), so a silently mis-scaled conversion (e.g.
-    off by 10x/100x/1000x from a units mixup inside the converter) would look identical in the console
-    to a correct one unless the produced USD is actually re-measured. This does that re-measurement
-    and fails loudly, with both numbers, if they don't round-trip.
+    Two things are checked, for two different reasons:
+
+    1. EXTENT (``hi - lo`` per axis) must match the source extent. This script leaves
+       ``MeshConverterCfg.scale`` at the default ``(1, 1, 1)`` on the reasoning that the source OBJ
+       coordinates are already SI metres (see module docstring's MEASURED GEOMETRY section) -- but
+       that reasoning is about the *input*, not the *output*. MeshConverter's own
+       ``use_meter_as_world_unit`` flag is a documented no-op (mesh_converter.py: "This does not work
+       right now :(, so we need to scale the mesh manually"), so a silently mis-scaled conversion (e.g.
+       off by 10x/100x/1000x from a units mixup inside the converter) would look identical in the
+       console to a correct one unless the produced USD is actually re-measured. Translation does not
+       change extent, so this check is unaffected by whether recentring was applied.
+
+    2. POSITION (``lo``/``hi`` themselves) must match the source bbox shifted by ``applied_translation``.
+       This is the actual "did the recentring survive conversion" check: it asserts the converted prim's
+       origin ends up exactly where the merged OBJ was translated to put it, catching both a translation
+       that got silently dropped and a converter that applies some independent auto-centring of its own
+       (which would double-translate or override ours instead of composing with it).
+
+    NOTE ON WHAT THIS DOES *NOT* ASSERT: it does not require the converted bbox to be symmetric about
+    the origin. When recentring to the volume centroid (the default), it will NOT be symmetric on the
+    long (X) axis for this specific part: the volume centroid (x=+0.062453 m in the raw frame) differs
+    from the bbox centre (x=+0.05625 m) because the threaded end is a distinct, partially-hollowed
+    geometry, not a mirror image of the plain rod end -- see the module docstring. Recentring to the
+    volume centroid is the physically correct target (it is what makes ``root_pos_w`` coincide with
+    PhysX's own centre-of-mass computation), so a residual, expected ~7 mm bbox-centre offset on X is
+    printed for visibility below, not treated as a failure.
     """
     stage = Usd.Stage.Open(usd_path)
     default_prim = stage.GetDefaultPrim()
     if not default_prim.IsValid():
-        raise RuntimeError(f"Converted USD at {usd_path} has no default prim; cannot verify extent.")
+        raise RuntimeError(f"Converted USD at {usd_path} has no default prim; cannot verify geometry.")
     bbox_cache = UsdGeom.BBoxCache(
         Usd.TimeCode.Default(),
         [UsdGeom.Tokens.default_, UsdGeom.Tokens.render, UsdGeom.Tokens.proxy, UsdGeom.Tokens.guide],
@@ -362,23 +454,51 @@ def _verify_converted_usd_extent(usd_path: str, expected_extent: list[float], to
     )
     rng = bbox_cache.ComputeWorldBound(default_prim).ComputeAlignedRange()
     lo, hi = rng.GetMin(), rng.GetMax()
-    got_extent = [hi[i] - lo[i] for i in range(3)]
-    diffs = [abs(got_extent[i] - expected_extent[i]) for i in range(3)]
+    got_bbox_min = [lo[i] for i in range(3)]
+    got_bbox_max = [hi[i] for i in range(3)]
+    got_extent = [got_bbox_max[i] - got_bbox_min[i] for i in range(3)]
+
+    expected_bbox_min = [source_bbox_min[i] - applied_translation[i] for i in range(3)]
+    expected_bbox_max = [source_bbox_max[i] - applied_translation[i] for i in range(3)]
+    expected_extent = [expected_bbox_max[i] - expected_bbox_min[i] for i in range(3)]
+
+    extent_diffs = [abs(got_extent[i] - expected_extent[i]) for i in range(3)]
+    pos_diffs = [
+        max(abs(got_bbox_min[i] - expected_bbox_min[i]), abs(got_bbox_max[i] - expected_bbox_max[i]))
+        for i in range(3)
+    ]
+    bbox_center_offset = [(got_bbox_min[i] + got_bbox_max[i]) / 2.0 for i in range(3)]
 
     print("-" * 80)
-    print("ROUND-TRIP CHECK: converted USD world-space bbox extent vs. measured source extent")
-    print(f"  measured source (combined, welded) extent : {['%.6f' % v for v in expected_extent]} m")
-    print(f"  converted USD world-space bbox extent      : {['%.6f' % v for v in got_extent]} m")
-    print(f"  |diff|                                      : {['%.6f' % v for v in diffs]} m"
+    print("ROUND-TRIP CHECK: converted USD world-space bbox vs. measured source bbox (translated)")
+    print(f"  applied recentring translation              : {['%.6f' % v for v in applied_translation]} m")
+    print(f"  expected (source - translation) bbox min/max : {['%.6f' % v for v in expected_bbox_min]} /"
+          f" {['%.6f' % v for v in expected_bbox_max]} m")
+    print(f"  converted USD world-space bbox min/max       : {['%.6f' % v for v in got_bbox_min]} /"
+          f" {['%.6f' % v for v in got_bbox_max]} m")
+    print(f"  extent |diff|                                 : {['%.6f' % v for v in extent_diffs]} m"
           f"  (tolerance {tolerance:.6f} m)")
-    if any(d > tolerance for d in diffs):
+    print(f"  position |diff| (bbox min & max, worst of two): {['%.6f' % v for v in pos_diffs]} m"
+          f"  (tolerance {tolerance:.6f} m)")
+    print(f"  bbox-centre residual offset from origin       : {['%.6f' % v for v in bbox_center_offset]} m"
+          "  (informational -- see docstring; expected to be non-zero on the long axis, NOT asserted)")
+    if any(d > tolerance for d in extent_diffs):
         raise RuntimeError(
             "Converted USD geometry does NOT match the measured source extent within tolerance -- "
-            f"expected {expected_extent} m, got {got_extent} m, diff {diffs} m > tolerance {tolerance} m."
-            " This is exactly the failure mode MeshConverter's use_meter_as_world_unit no-op comment"
-            " warns about -- do NOT trust this USD; do not use it downstream."
+            f"expected {expected_extent} m, got {got_extent} m, diff {extent_diffs} m > tolerance"
+            f" {tolerance} m. This is exactly the failure mode MeshConverter's use_meter_as_world_unit"
+            " no-op comment warns about -- do NOT trust this USD; do not use it downstream."
         )
-    print("  OK: converted USD extent matches the measured source within tolerance.")
+    if any(d > tolerance for d in pos_diffs):
+        raise RuntimeError(
+            "Converted USD bbox position does NOT match the source bbox shifted by the applied"
+            f" recentring translation, within tolerance -- expected min {expected_bbox_min} m /"
+            f" max {expected_bbox_max} m, got min {got_bbox_min} m / max {got_bbox_max} m, diff"
+            f" {pos_diffs} m > tolerance {tolerance} m. Either the recentring translation was not"
+            " applied to what MeshConverter actually consumed, or MeshConverter applied its own"
+            " independent transform on top of it -- do NOT trust this USD; do not use it downstream."
+        )
+    print("  OK: converted USD extent and position match the (translated) source within tolerance.")
     print("-" * 80)
 
 
@@ -470,7 +590,35 @@ def main():
     usd_path_rel = pathlib.Path(os.path.relpath(os.path.join(output_dir, args_cli.usd_file_name), REPO_ROOT))
     instanceable_meshes_rel = usd_path_rel.parent / "Props" / "instanceable_meshes.usd"
 
-    # merge body + thread into one triangle soup and re-measure the combined, welded solid.
+    # merge body + thread into one triangle soup (in memory) and re-measure the combined, welded solid.
+    verts, tris = _merge_obj(body_path, thread_path)
+    raw_stats = _mesh_stats("combined (body+thread, RAW -- before any recentring)", verts, tris)
+
+    # recentre so the prim origin coincides with the volume centroid, not the raw OBJ coordinate
+    # origin -- see the module docstring's "WHY THE MERGED MESH IS RECENTRED" section for why this
+    # matters (root_pos_w == root_link_pos_w is what every success/curriculum term in this repo reads,
+    # and this task leaves orientation unconstrained, so an off-centre origin corrupts every distance
+    # measured off this object once it starts rotating).
+    if args_cli.recenter_to_centroid:
+        translation = raw_stats["centroid"]
+        print(
+            f"[INFO] Recentring: translating merged mesh by {[-t for t in translation]} m so the volume"
+            " centroid (printed above) lands at the origin -- this becomes the USD prim origin /"
+            " root_pos_w after conversion."
+        )
+        verts = _translate_verts(verts, translation)
+        combined_stats = _mesh_stats(
+            "combined (body+thread, RECENTRED to volume centroid, fed to MeshConverter)", verts, tris
+        )
+        print(
+            f"[INFO] Post-recentring residual centroid offset from origin: {combined_stats['centroid']} m"
+            " (should be ~0 by construction; printed as a sanity check on the translation above)."
+        )
+    else:
+        translation = [0.0, 0.0, 0.0]
+        print("[INFO] --no-recenter-to-centroid passed: prim origin left at the raw OBJ coordinate origin.")
+        combined_stats = raw_stats
+
     # Written to a SYSTEM TEMP DIR, not under output_dir (the tracked source tree): .gitignore only
     # blanket-ignores **/*.usd*, not .obj, so a ~31.8k-vertex intermediate OBJ left in
     # source/isaaclab_assets/... would be silently committable by accident. It is purely a
@@ -479,8 +627,7 @@ def main():
     merged_obj_dir = tempfile.mkdtemp(prefix="convert_table_leg_merged_")
     merged_obj_path = os.path.join(merged_obj_dir, "square_table_leg4_200mm_merged.obj")
     print(f"[INFO] Writing merged intermediate OBJ to temp dir (not the source tree): {merged_obj_path}")
-    verts, tris = _merge_obj(body_path, thread_path, merged_obj_path)
-    combined_stats = _mesh_stats("combined (body+thread, fed to MeshConverter)", verts, tris)
+    _write_obj(verts, tris, merged_obj_path)
 
     density = args_cli.mass / combined_stats["volume"]
     print("-" * 80)
@@ -524,9 +671,17 @@ def main():
     mesh_converter = MeshConverter(mesh_converter_cfg)
     print(f"Generated USD file: {mesh_converter.usd_path}")
 
-    # verify the CONVERTED USD's geometry round-trips to the measured source extent (see docstring
-    # of _verify_converted_usd_extent for why this can't just be inferred from scale=(1,1,1)).
-    _verify_converted_usd_extent(mesh_converter.usd_path, combined_stats["extent"], args_cli.bbox_tolerance)
+    # verify the CONVERTED USD's geometry round-trips to the measured source bbox (extent AND, since
+    # the recentring translation above must survive conversion, position) -- see docstring of
+    # _verify_converted_usd_geometry for why this can't just be inferred from scale=(1,1,1) or assumed
+    # to symmetric-about-origin.
+    _verify_converted_usd_geometry(
+        mesh_converter.usd_path,
+        raw_stats["bbox_min"],
+        raw_stats["bbox_max"],
+        translation,
+        args_cli.bbox_tolerance,
+    )
 
     # activate contact sensors on the resulting rigid body -- the dexsuite reward path reads
     # per-fingertip contacts filtered to the object prim, which requires the PhysX contact-report API.

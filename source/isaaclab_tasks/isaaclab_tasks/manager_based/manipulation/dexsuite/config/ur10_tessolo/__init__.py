@@ -62,6 +62,36 @@ gym.register(
     },
 )
 
+# Dexsuite Lift Environments -- real FurnitureBench table-leg manipuland variant.
+# Reuses the exact same agents/ configs (rl_games_ppo_cfg.yaml, DexsuiteUR10TessoloPPORunnerCfg)
+# as the primitives Lift task above, so training hyperparameters are identical and the only
+# difference under comparison is the manipuland (see dexsuite_ur10_tessolo_tableleg_env_cfg.py).
+gym.register(
+    id="Isaac-Dexsuite-UR10-Tessolo-TableLeg-Lift-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": (
+            f"{__name__}.dexsuite_ur10_tessolo_tableleg_env_cfg:DexsuiteUR10TessoloTableLegLiftEnvCfg"
+        ),
+        "rl_games_cfg_entry_point": f"{agents.__name__}:rl_games_ppo_cfg.yaml",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:DexsuiteUR10TessoloPPORunnerCfg",
+    },
+)
+
+gym.register(
+    id="Isaac-Dexsuite-UR10-Tessolo-TableLeg-Lift-Play-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": (
+            f"{__name__}.dexsuite_ur10_tessolo_tableleg_env_cfg:DexsuiteUR10TessoloTableLegLiftEnvCfg_PLAY"
+        ),
+        "rl_games_cfg_entry_point": f"{agents.__name__}:rl_games_ppo_cfg.yaml",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:DexsuiteUR10TessoloPPORunnerCfg",
+    },
+)
+
 # Visible point-cloud observation variants
 gym.register(
     id="Isaac-Dexsuite-UR10-Tessolo-Reorient-Visible-v0",

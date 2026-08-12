@@ -37,7 +37,23 @@ TABLE_LEG_USD_PATH = (
 # `env.scene.object.spawn.mass_props.mass=<value>` -- IsaacLab's update_class_from_dict rejects any
 # hydra key that is not already present in the dataclass tree (see UR10TessoloMixinCfg's
 # `rewards.*.params["threshold"]` comment in dexsuite_ur10_tessolo_env_cfg.py for the same trap).
-TABLE_LEG_MASS_KG = 0.022750
+#
+# Corrected from the original 0.022750 kg. The mesh volume is 157.3 cm^3, so 22.75 g implied a
+# density of ~144.6 kg/m^3 -- styrofoam, not the printed PLA or wood a real FurnitureBench leg is
+# made from (500-1250 kg/m^3). 0.12 kg implies ~763 kg/m^3, in the hardwood range.
+#
+# The reward gate is the operative reason for the correction, not just the density mismatch.
+# `position_tracking` and `success` are both gated on 1.0 N of fingertip contact force (see
+# UR10TessoloMixinCfg's `rewards.*.params["threshold"]` in dexsuite_ur10_tessolo_env_cfg.py) --
+# a threshold inherited from the stock primitives task, whose objects weigh 40-400 g. At the old
+# 22.75 g the object weighed only 0.223 N, so the gate demanded ~4.5x the object's own weight
+# before paying any tracking reward; pressing that hard on a free light object ejects it rather
+# than holding it. With `object_scale_mass` randomizing [0.5, 1.5] below, 0.12 kg yields 60-180 g,
+# centered inside the 40-400 g envelope the gate was calibrated against.
+#
+# The fix belongs on the asset, not the gate: lowering the 1.0 N threshold instead would change
+# the task definition and would still leave the object's mass wrong for sim-to-real transfer.
+TABLE_LEG_MASS_KG = 0.12
 
 
 @configclass

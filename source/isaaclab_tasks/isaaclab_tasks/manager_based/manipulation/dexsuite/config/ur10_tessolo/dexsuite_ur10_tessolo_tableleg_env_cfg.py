@@ -107,12 +107,13 @@ class TableLegEventCfg(ur10_tessolo.UR10TessoloEventCfg):
     # env would have gotten scale=1.0 anyway.
     randomize_object_scale = None
 
-    # Real leg mass is 22.75 g (TABLE_LEG_MASS_KG). The inherited [0.2, 2.0] SCALE range spans
-    # 4.55-45.5 g. dexsuite's [0.2, 2.0] range is tuned for the 200 g primitives (40-400 g
-    # absolute); on the leg its low end sits only ~4.5x above the ~1 g "prop silently left at ~1 g,
-    # flung by contact, produced false-positive grasps" failure mode already hit on this project.
-    # Narrowed to [0.5, 1.5] -> 11.375-34.125 g: keeps >10x headroom above the known ~1 g failure
-    # floor while still giving +/-50% mass domain randomization around the authored value.
+    # Real leg mass is 120 g (TABLE_LEG_MASS_KG = 0.12 kg). The inherited [0.2, 2.0] SCALE range
+    # spans 24-240 g. dexsuite's [0.2, 2.0] range is tuned for the 200 g primitives (40-400 g
+    # absolute); the low end (24 g) already sits a comfortable ~24x above the ~1 g "prop silently
+    # left at ~1 g, flung by contact, produced false-positive grasps" failure mode already hit on
+    # this project. Narrowed to [0.5, 1.5] -> 60-180 g: keeps well over an order of magnitude of
+    # headroom above the known ~1 g failure floor while still giving +/-50% mass domain
+    # randomization around the authored value.
     object_scale_mass = EventTerm(
         func=mdp.randomize_rigid_body_mass,
         mode="startup",

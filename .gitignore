@@ -60,6 +60,7 @@ _build
 
 # Pre-Trained Checkpoints
 /.pretrained_checkpoints/
+/local_ckpts/
 
 # Teleop Recorded Dataset
 /datasets/
@@ -91,3 +92,5 @@ eval_results*.txt
 .beads
 AGENTS.md
 CLAUDE.md
+# Downloaded RL checkpoints pulled back from rented boxes for local inspection.
+local_ckpts/

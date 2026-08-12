@@ -94,3 +94,7 @@ AGENTS.md
 CLAUDE.md
 # Downloaded RL checkpoints pulled back from rented boxes for local inspection.
 local_ckpts/
+
+# Local Isaac Sim venv and provisioning stamps for rendering/eval on this machine.
+.venv_local/
+.provision_local/

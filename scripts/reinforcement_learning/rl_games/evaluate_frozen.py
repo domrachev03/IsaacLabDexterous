@@ -294,18 +294,32 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg, agent_cfg: dict):
     for seed in args_cli.seeds:
         if total_completed >= target_total:
             break
-        # explicit, reproducible reseed for this block (held-out seeds are just any int here)
-        env.seed(seed)
-        obs = env.reset()
-        if isinstance(obs, dict):
-            obs = obs["obs"]
-        if not batch_size_initialized:
-            # required once (mirrors play.py): enables the flag for batched observations
-            _ = agent.get_batch_size(obs, 1)
-            batch_size_initialized = True
-        agent.reset()
-        if agent.is_rnn:
-            agent.init_rnn()
+        # INFERENCE-MODE HAZARD - this block must stay inside torch.inference_mode(), matching the
+        # stepping loop below. Tensors allocated while inference mode is active are permanently
+        # tagged as "inference tensors", and PyTorch forbids in-place writes to them from outside
+        # an inference-mode context. IsaacLab's reset path does exactly such a write
+        # (rigid_object.py write_root_link_pose_to_sim -> `self._data.root_link_pose_w[env_ids] = ...`),
+        # so once ANY seed's rollout has run under inference mode, a later reset outside it dies with
+        # "Inplace update to inference tensor outside InferenceMode is not allowed."
+        #
+        # This fails in a way that hides itself: the FIRST seed always succeeds, because its reset
+        # happens before any inference-mode stepping has tagged the buffers. Only the second seed
+        # crashes - and multi-seed evaluation is the whole point of this script, since the acceptance
+        # criterion is >=1024 episodes spread across explicit held-out seeds. Measured: seed 90001
+        # completed 516 episodes, then seed 90002 raised on env.reset().
+        with torch.inference_mode():
+            # explicit, reproducible reseed for this block (held-out seeds are just any int here)
+            env.seed(seed)
+            obs = env.reset()
+            if isinstance(obs, dict):
+                obs = obs["obs"]
+            if not batch_size_initialized:
+                # required once (mirrors play.py): enables the flag for batched observations
+                _ = agent.get_batch_size(obs, 1)
+                batch_size_initialized = True
+            agent.reset()
+            if agent.is_rnn:
+                agent.init_rnn()
         sticky_success[:] = False
         seed_completed = 0
         seed_outcome_counts = {"success": 0, "timeout": 0, "out_of_bounds": 0, "other": 0}
